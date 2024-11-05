@@ -1,4 +1,4 @@
-module github.com/danbiagini/traefikcloudsaver
+module github.com/danbiagini/traefik-cloud-saver
 
 go 1.19
 
