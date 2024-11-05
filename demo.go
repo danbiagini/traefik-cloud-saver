@@ -1,4 +1,4 @@
-// Package pluginproviderdemo contains a demo of the provider's plugin.
+// Package traefikcloudsaver contains functionality to turn off cloud instances when traffic is below a thresh.
 package traefikcloudsaver
 
 import (
