@@ -1,4 +1,4 @@
-package pluginproviderdemo_test
+package traefikcloudsaver_test
 
 import (
 	"bytes"
@@ -9,14 +9,14 @@ import (
 
 	"github.com/traefik/genconf/dynamic"
 	"github.com/traefik/genconf/dynamic/tls"
-	"github.com/traefik/pluginproviderdemo"
+	"github.com/danbiagini/traefik-cloud-saver"
 )
 
 func TestNew(t *testing.T) {
-	config := pluginproviderdemo.CreateConfig()
+	config := traefikcloudsaver.CreateConfig()
 	config.PollInterval = "1s"
 
-	provider, err := pluginproviderdemo.New(context.Background(), config, "test")
+	provider, err := traefikcloudsaver.New(context.Background(), config, "test")
 	if err != nil {
 		t.Fatal(err)
 	}
