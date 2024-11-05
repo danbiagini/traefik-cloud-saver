@@ -1,4 +1,4 @@
-module github.com/traefik/pluginproviderdemo
+module github.com/danbiagini/traefikcloudsaver
 
 go 1.19
 
