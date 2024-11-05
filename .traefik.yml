@@ -2,7 +2,7 @@ displayName: Provider Plugin Demo
 type: provider
 iconPath: .assets/icon.png
 
-import: github.com/traefik/pluginproviderdemo
+import: github.com/danbiagini/traefik-cloud-saver
 
 summary: '[Demo] Simple Provider Plugin'
 
