@@ -1,14 +1,12 @@
-package traefikcloudsaver
+package traefik_cloud_saver
 
 import (
 	"bytes"
 	"context"
 	"encoding/json"
 	"testing"
-	"time"
 
 	"github.com/traefik/genconf/dynamic"
-	"github.com/traefik/genconf/dynamic/tls"
 )
 
 func TestNew(t *testing.T) {
@@ -42,60 +40,12 @@ func TestNew(t *testing.T) {
 	data := <-cfgChan
 
 	expected := &dynamic.Configuration{
-		HTTP: &dynamic.HTTPConfiguration{
-			Routers: map[string]*dynamic.Router{
-				"pp-route-01": {
-					EntryPoints: []string{"web"},
-					Service:     "pp-service-01",
-					Rule:        "Host(`example.com`)",
-				},
-			},
-			Services: map[string]*dynamic.Service{
-				"pp-service-01": {
-					LoadBalancer: &dynamic.ServersLoadBalancer{
-						Servers: []dynamic.Server{
-							{
-								URL: "http://localhost:9090",
-							},
-						},
-						PassHostHeader: boolPtr(true),
-					},
-				},
-			},
-			Middlewares:       make(map[string]*dynamic.Middleware),
-			ServersTransports: make(map[string]*dynamic.ServersTransport),
-		},
-		TCP: &dynamic.TCPConfiguration{
-			Routers:  make(map[string]*dynamic.TCPRouter),
-			Services: make(map[string]*dynamic.TCPService),
-		},
-		TLS: &dynamic.TLSConfiguration{
-			Stores:  make(map[string]tls.Store),
-			Options: make(map[string]tls.Options),
-		},
-		UDP: &dynamic.UDPConfiguration{
-			Routers:  make(map[string]*dynamic.UDPRouter),
-			Services: make(map[string]*dynamic.UDPService),
-		},
-	}
-
-	if time.Now().Minute()%2 == 0 {
-		expected.HTTP.Routers["pp-route-02"] = &dynamic.Router{
-			EntryPoints: []string{"web"},
-			Service:     "pp-service-02",
-			Rule:        "Host(`another.example.com`)",
-		}
-
-		expected.HTTP.Services["pp-service-02"] = &dynamic.Service{
-			LoadBalancer: &dynamic.ServersLoadBalancer{
-				Servers: []dynamic.Server{
-					{
-						URL: "http://localhost:9091",
-					},
-				},
-				PassHostHeader: boolPtr(true),
-			},
-		}
+        HTTP: &dynamic.HTTPConfiguration{
+            Routers:           make(map[string]*dynamic.Router),
+            Services:          make(map[string]*dynamic.Service),
+            Middlewares:       make(map[string]*dynamic.Middleware),
+            ServersTransports: make(map[string]*dynamic.ServersTransport),
+        },
 	}
 
 	expectedJSON, err := json.MarshalIndent(expected, "", "  ")

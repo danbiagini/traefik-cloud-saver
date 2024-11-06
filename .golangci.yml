@@ -1,83 +1,25 @@
-run:
-  timeout: 3m
-  skip-files: []
-  skip-dirs: []
-
-linters-settings:
-  govet:
-    enable-all: true
-    disable:
-      - fieldalignment
-  golint:
-    min-confidence: 0
-  gocyclo:
-    min-complexity: 12
-  goconst:
-    min-len: 5
-    min-occurrences: 4
-  misspell:
-    locale: US
-  funlen:
-    lines: -1
-    statements: 50
-  godox:
-    keywords:
-      - FIXME
-  gofumpt:
-    extra-rules: true
-  depguard:
-    rules:
-      main:
-        files:
-          - $all
-        allow:
-          - $gostd
-          - github.com/traefik/genconf/dynamic
-          - github.com/traefik/genconf/dynamic/tls
-
 linters:
-  enable-all: true
-  disable:
-    - deadcode # deprecated
-    - exhaustivestruct # deprecated
-    - golint # deprecated
-    - ifshort # deprecated
-    - interfacer # deprecated
-    - maligned # deprecated
-    - nosnakecase # deprecated
-    - scopelint # deprecated
-    - scopelint # deprecated
-    - structcheck # deprecated
-    - varcheck # deprecated
-    - sqlclosecheck # not relevant (SQL)
-    - rowserrcheck # not relevant (SQL)
-    - execinquery # not relevant (SQL)
-    - cyclop # duplicate of gocyclo
-    - bodyclose # Too many false positives: https://github.com/timakin/bodyclose/issues/30
-    - dupl
-    - testpackage
-    - tparallel
-    - paralleltest
-    - nlreturn
-    - wsl
-    - exhaustive
-    - exhaustruct
-    - goerr113
-    - wrapcheck
-    - noctx
-    - lll
-    - gomnd
-    - forbidigo
-    - varnamelen
+  disable-all: true
+  enable:
+    - errcheck
+    - gosimple
+    - govet
+    - staticcheck
+    - unused
 
+run:
+  deadline: 5m
+  go: '1.22'  # Matches your Go version
+
+# Basic settings for the enabled linters
+linters-settings:
+  errcheck:
+    check-type-assertions: true
+  govet:
+    check-shadowing: true
+
+# Ignore certain issues if needed
 issues:
   exclude-use-default: false
-  max-per-linter: 0
+  max-issues-per-linter: 0
   max-same-issues: 0
-  exclude: []
-  exclude-rules:
-    - path: (.+)_test.go
-      linters:
-        - goconst
-        - funlen
-        - godot

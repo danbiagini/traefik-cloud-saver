@@ -1,5 +1,5 @@
-// Package traefikcloudsaver contains functionality to turn off cloud instances when traffic is below a thresh.
-package traefikcloudsaver
+// Package traefik_cloud_saver contains functionality to turn off cloud instances when traffic is below a thresh.  "Turn the lights off when the room is empty"
+package traefik_cloud_saver
 
 import (
 	"context"
@@ -7,41 +7,57 @@ import (
 	"errors"
 	"log"
 	"time"
+	"fmt"
 
 	"github.com/traefik/genconf/dynamic"
-	"github.com/traefik/genconf/dynamic/tls"
 )
 
 // Config the plugin configuration.
 type Config struct {
 	PollInterval string `json:"pollInterval,omitempty"`
+	TrafficThreshold float64 `json:"trafficThreshold,omitempty"`
+	WindowSize       string  `json:"windowSize,omitempty"`
+	MetricsURL       string  `json:"metricsURL,omitempty"`
 }
 
 // CreateConfig creates the default plugin configuration.
 func CreateConfig() *Config {
 	return &Config{
-		PollInterval: "5s", // 5 * time.Second
+		PollInterval: 		"5s", // 5 * time.Second
+		TrafficThreshold: 	1,
+		WindowSize:       	"5m",
+		MetricsURL:			"http://localhost:8080/metrics",
 	}
 }
 
-// Provider a simple provider plugin.
+// CloudSaver provider plugin to turn off cloud instances when traffic is below a threshold.
 type Provider struct {
 	name         string
 	pollInterval time.Duration
-
+	trafficThreshold float64
+	metricsCollector *MetricsCollector
 	cancel func()
 }
+
+// type TrafficStats struct {
+// 	mutex sync.RWMutex
+// 	requests []time.Time
+// 	windowSize time.Duration
+// }
 
 // New creates a new Provider plugin.
 func New(_ context.Context, config *Config, name string) (*Provider, error) {
 	pi, err := time.ParseDuration(config.PollInterval)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("invalid poll interval: %w", err)
 	}
 
+	collector := NewMetricsCollector(config.MetricsURL)
 	return &Provider{
 		name:         name,
 		pollInterval: pi,
+		trafficThreshold: config.TrafficThreshold,
+		metricsCollector: collector,
 	}, nil
 }
 
@@ -78,10 +94,14 @@ func (p *Provider) loadConfiguration(ctx context.Context, cfgChan chan<- json.Ma
 
 	for {
 		select {
-		case t := <-ticker.C:
-			configuration := generateConfiguration(t)
+		case <-ticker.C:
+			configuration, err := p.generateConfiguration()
+			if err != nil {
+				log.Printf("ERROR: Failed to generate configuration: %v", err)
+				continue
+			}
 
-			cfgChan <- &dynamic.JSONPayload{Configuration: configuration}
+			cfgChan <- configuration
 
 		case <-ctx.Done():
 			return
@@ -95,67 +115,29 @@ func (p *Provider) Stop() error {
 	return nil
 }
 
-func generateConfiguration(date time.Time) *dynamic.Configuration {
-	configuration := &dynamic.Configuration{
-		HTTP: &dynamic.HTTPConfiguration{
-			Routers:           make(map[string]*dynamic.Router),
-			Middlewares:       make(map[string]*dynamic.Middleware),
-			Services:          make(map[string]*dynamic.Service),
-			ServersTransports: make(map[string]*dynamic.ServersTransport),
-		},
-		TCP: &dynamic.TCPConfiguration{
-			Routers:  make(map[string]*dynamic.TCPRouter),
-			Services: make(map[string]*dynamic.TCPService),
-		},
-		TLS: &dynamic.TLSConfiguration{
-			Stores:  make(map[string]tls.Store),
-			Options: make(map[string]tls.Options),
-		},
-		UDP: &dynamic.UDPConfiguration{
-			Routers:  make(map[string]*dynamic.UDPRouter),
-			Services: make(map[string]*dynamic.UDPService),
-		},
+func (p *Provider) generateConfiguration() (*dynamic.JSONPayload, error) {
+	// Get current service rates
+	rates, err := p.metricsCollector.GetServiceRates()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get service rates: %w", err)
 	}
 
-	configuration.HTTP.Routers["pp-route-01"] = &dynamic.Router{
-		EntryPoints: []string{"web"},
-		Service:     "pp-service-01",
-		Rule:        "Host(`example.com`)",
-	}
-
-	configuration.HTTP.Services["pp-service-01"] = &dynamic.Service{
-		LoadBalancer: &dynamic.ServersLoadBalancer{
-			Servers: []dynamic.Server{
-				{
-					URL: "http://localhost:9090",
-				},
-			},
-			PassHostHeader: boolPtr(true),
-		},
-	}
-
-	if date.Minute()%2 == 0 {
-		configuration.HTTP.Routers["pp-route-02"] = &dynamic.Router{
-			EntryPoints: []string{"web"},
-			Service:     "pp-service-02",
-			Rule:        "Host(`another.example.com`)",
-		}
-
-		configuration.HTTP.Services["pp-service-02"] = &dynamic.Service{
-			LoadBalancer: &dynamic.ServersLoadBalancer{
-				Servers: []dynamic.Server{
-					{
-						URL: "http://localhost:9091",
-					},
-				},
-				PassHostHeader: boolPtr(true),
-			},
+	// Log services below threshold
+	for serviceName, rate := range rates {
+		if rate.PerMin < p.trafficThreshold {
+			log.Printf("LOW TRAFFIC ALERT: Service %s is below threshold (%.2f < %.2f req/min)",
+				serviceName, rate.PerMin, p.trafficThreshold)
 		}
 	}
 
-	return configuration
-}
-
-func boolPtr(v bool) *bool {
-	return &v
+	// Return unchanged configuration
+	return &dynamic.JSONPayload{
+		Configuration: &dynamic.Configuration{
+			HTTP: &dynamic.HTTPConfiguration{
+				Routers:     make(map[string]*dynamic.Router),
+				Services:    make(map[string]*dynamic.Service),
+				Middlewares: make(map[string]*dynamic.Middleware),
+			},
+		},
+	}, nil
 }

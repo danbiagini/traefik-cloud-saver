@@ -1,0 +1,32 @@
+version: '3.8'
+
+services:
+  traefik:
+    build:
+      context: ..  # Changed to parent directory for proper context
+      dockerfile: test/Dockerfile.traefik
+    container_name: traefik-test
+    ports:
+      - "80:80"
+      - "8080:8080" # Dashboard
+    volumes:
+      - ../test/traefik.yml:/etc/traefik/traefik.yml
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    environment:
+      - TRAEFIK_EXPERIMENTAL_PLUGINS_MYPLUGIN_MODULENAME=github.com/your-username/your-plugin
+      - TRAEFIK_EXPERIMENTAL_PLUGINS_MYPLUGIN_VERSION=v0.1.0
+    command:
+      - --log.level=DEBUG
+      - --api.insecure=true
+      - --providers.docker=true
+      - --providers.docker.exposedbydefault=false
+      - --experimental.plugins.myplugin.modulename=github.com/your-username/your-plugin
+      - --experimental.plugins.myplugin.version=v0.1.0
+  whoami:
+    image: traefik/whoami
+    ports:
+      - "8081:80"
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.whoami.rule=Host(`whoami.localhost`)
+      - traefik.http.services.whoami.loadbalancer.server.port=80
