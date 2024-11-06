@@ -25,6 +25,15 @@ linters-settings:
       - FIXME
   gofumpt:
     extra-rules: true
+  depguard:
+    rules:
+      main:
+        files:
+          - $all
+        allow:
+          - $gostd
+          - github.com/traefik/genconf/dynamic
+          - github.com/traefik/genconf/dynamic/tls
 
 linters:
   enable-all: true

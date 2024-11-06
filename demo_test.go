@@ -1,4 +1,4 @@
-package traefikcloudsaver_test
+package traefikcloudsaver
 
 import (
 	"bytes"
@@ -9,14 +9,13 @@ import (
 
 	"github.com/traefik/genconf/dynamic"
 	"github.com/traefik/genconf/dynamic/tls"
-	"github.com/danbiagini/traefik-cloud-saver"
 )
 
 func TestNew(t *testing.T) {
-	config := traefikcloudsaver.CreateConfig()
+	config := CreateConfig()
 	config.PollInterval = "1s"
 
-	provider, err := traefikcloudsaver.New(context.Background(), config, "test")
+	provider, err := New(context.Background(), config, "test")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -112,8 +111,4 @@ func TestNew(t *testing.T) {
 	if !bytes.Equal(expectedJSON, dataJSON) {
 		t.Fatalf("got %s, want: %s", string(dataJSON), string(expectedJSON))
 	}
-}
-
-func boolPtr(v bool) *bool {
-	return &v
 }
