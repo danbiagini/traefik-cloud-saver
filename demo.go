@@ -4,7 +4,7 @@ package traefikcloudsaver
 import (
 	"context"
 	"encoding/json"
-	"fmt"
+	"errors"
 	"log"
 	"time"
 
@@ -33,7 +33,7 @@ type Provider struct {
 }
 
 // New creates a new Provider plugin.
-func New(ctx context.Context, config *Config, name string) (*Provider, error) {
+func New(_ context.Context, config *Config, name string) (*Provider, error) {
 	pi, err := time.ParseDuration(config.PollInterval)
 	if err != nil {
 		return nil, err
@@ -48,7 +48,7 @@ func New(ctx context.Context, config *Config, name string) (*Provider, error) {
 // Init the provider.
 func (p *Provider) Init() error {
 	if p.pollInterval <= 0 {
-		return fmt.Errorf("poll interval must be greater than 0")
+		return errors.New("poll interval must be greater than 0")
 	}
 
 	return nil
