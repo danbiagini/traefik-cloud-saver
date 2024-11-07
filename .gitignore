@@ -1,1 +1,39 @@
+# Go specific
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+go.work
+
+# Vendor directory (though some projects commit this)
+vendor/
+
+# Build output
+bin/
+dist/
+build/
+
+# IDE specific
 .idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+
+# Debug files
+debug/
+
+# Log files
+*.log
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# Test coverage
+coverage.txt
+coverage.html
