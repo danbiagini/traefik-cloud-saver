@@ -18,3 +18,13 @@ vendor:
 
 clean:
 	rm -rf ./vendor
+
+build-test-container:
+	cd test && docker compose build traefik
+
+# run test container, depend on build-test-container
+run-test-container: build-test-container
+	cd test && docker compose up -d
+
+stop-test-container:
+	cd test && docker compose down
