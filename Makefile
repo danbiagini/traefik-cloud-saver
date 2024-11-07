@@ -7,13 +7,15 @@ default: lint test
 lint:
 	golangci-lint run
 
-test:
+test: vendor
 	go test -v -cover ./...
 
 yaegi_test:
 	yaegi test .
 
 vendor:
+	go get google.golang.org/api@latest
+	go mod tidy
 	go mod vendor
 
 clean:

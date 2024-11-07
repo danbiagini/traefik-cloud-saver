@@ -10,6 +10,7 @@ import (
 	"fmt"
 
 	"github.com/traefik/genconf/dynamic"
+	"github.com/danbiagini/traefik-cloud-saver/cloud"
 )
 
 // Config the plugin configuration.
@@ -44,8 +45,9 @@ type Provider struct {
 	windowSize      time.Duration
 	routerFilter    *RouterFilter
 	metricsCollector *MetricsCollector
-	testMode        bool
-	cancel          func()
+	cloudService     cloud.Service
+	testMode         bool
+	cancel           func()
 }
 
 // type TrafficStats struct {
@@ -55,7 +57,7 @@ type Provider struct {
 // }
 
 // New creates a new Provider plugin.
-func New(_ context.Context, config *Config, name string) (*Provider, error) {
+func New(_ context.Context, config *Config, name string) (*CloudSaver, error) {
 	windowSize, err := time.ParseDuration(config.WindowSize)
 	if err != nil {
 		return nil, fmt.Errorf("invalid window size: %w", err)
@@ -67,7 +69,7 @@ func New(_ context.Context, config *Config, name string) (*Provider, error) {
 	}
 
 	collector := NewMetricsCollector(config.MetricsURL)
-	return &Provider{
+	return &CloudSaver{
 		name:            name,
 		windowSize:      windowSize,
 		trafficThreshold: config.TrafficThreshold,
@@ -78,7 +80,7 @@ func New(_ context.Context, config *Config, name string) (*Provider, error) {
 }
 
 // Init the provider.
-func (p *Provider) Init() error {
+func (p *CloudSaver) Init() error {
 	// Runtime validation - ensures the plugin is in a valid state to start
 	if p.windowSize < time.Minute && !p.testMode {
 		return errors.New("window size must be at least 1 minute")
@@ -98,7 +100,7 @@ func (p *Provider) Init() error {
 
 
 // Provide creates and send dynamic configuration.
-func (p *Provider) Provide(cfgChan chan<- json.Marshaler) error {
+func (p *CloudSaver) Provide(cfgChan chan<- json.Marshaler) error {
 	ctx, cancel := context.WithCancel(context.Background())
 	p.cancel = cancel
 
@@ -115,7 +117,7 @@ func (p *Provider) Provide(cfgChan chan<- json.Marshaler) error {
 	return nil
 }
 
-func (p *Provider) loadConfiguration(ctx context.Context, cfgChan chan<- json.Marshaler) {
+func (p *CloudSaver) loadConfiguration(ctx context.Context, cfgChan chan<- json.Marshaler) {
 	ticker := time.NewTicker(p.windowSize)
 	defer ticker.Stop()
 
@@ -137,12 +139,12 @@ func (p *Provider) loadConfiguration(ctx context.Context, cfgChan chan<- json.Ma
 }
 
 // Stop to stop the provider and the related go routines.
-func (p *Provider) Stop() error {
+func (p *CloudSaver) Stop() error {
 	p.cancel()
 	return nil
 }
 
-func (p *Provider) generateConfiguration() (*dynamic.JSONPayload, error) {
+func (p *CloudSaver) generateConfiguration() (*dynamic.JSONPayload, error) {
 	// Get current service rates
 	rates, err := p.metricsCollector.GetServiceRates()
 	if err != nil {
@@ -176,13 +178,13 @@ func (p *Provider) generateConfiguration() (*dynamic.JSONPayload, error) {
 }
 
 // Get the router for a given service
-func (p *Provider) getRouterForService(serviceName string) *dynamic.Router {
+func (p *CloudSaver) getRouterForService(serviceName string) *dynamic.Router {
 	// TODO: Implement router lookup logic here.  Need to design a filtering mechanism.
 	return nil
 }
 
 // Add a helper method to check if a router should be monitored
-func (p *Provider) shouldMonitorRouter(router *dynamic.Router) bool {
+func (p *CloudSaver) shouldMonitorRouter(router *dynamic.Router) bool {
 	if p.routerFilter == nil {
 		return true // monitor all routers if no filter specified
 	}

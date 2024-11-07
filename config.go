@@ -2,7 +2,7 @@ package traefik_cloud_saver
 
 import (
 	"time"
-	"github.com/your-repo/traefik-cloud-saver/cloud"
+	"github.com/danbiagini/traefik-cloud-saver/cloud"
 )
 
 // Config the plugin configuration.
@@ -11,7 +11,7 @@ type Config struct {
 	WindowSize       string             `json:"windowSize,omitempty"`
 	MetricsURL       string             `json:"metricsURL,omitempty"`
 	RouterFilter     *RouterFilter      `json:"routerFilter,omitempty"`
-	CloudConfig      *cloud.ProviderConfig `json:"cloudProvider,omitempty"`
+	CloudConfig      *cloud.ServiceConfig `json:"cloudService,omitempty"`
 	testMode         bool
 }
 
@@ -22,7 +22,7 @@ func CreateConfig() *Config {
 		WindowSize:      "5m",
 		MetricsURL:     "http://localhost:8080/metrics",
 		RouterFilter:    nil,
-		CloudConfig:     &cloud.ProviderConfig{
+		CloudConfig:     &cloud.ServiceConfig{
 			ResourceTags: make(map[string]string),
 		},
 		testMode:        false,
