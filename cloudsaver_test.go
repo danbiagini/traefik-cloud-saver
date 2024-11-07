@@ -11,7 +11,8 @@ import (
 
 func TestNew(t *testing.T) {
 	config := CreateConfig()
-	config.PollInterval = "1s"
+	config.WindowSize = "1s"
+	config.testMode = true
 
 	provider, err := New(context.Background(), config, "test")
 	if err != nil {
