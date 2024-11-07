@@ -14,29 +14,38 @@ import (
 
 // Config the plugin configuration.
 type Config struct {
-	PollInterval string `json:"pollInterval,omitempty"`
-	TrafficThreshold float64 `json:"trafficThreshold,omitempty"`
-	WindowSize       string  `json:"windowSize,omitempty"`
-	MetricsURL       string  `json:"metricsURL,omitempty"`
+	TrafficThreshold float64           `json:"trafficThreshold,omitempty"`
+	WindowSize      string            `json:"windowSize,omitempty"`
+	MetricsURL      string            `json:"metricsURL,omitempty"`
+	RouterFilter    *RouterFilter     `json:"routerFilter,omitempty"`
+	testMode        bool              // unexported, internal UT flag
+}
+
+// RouterFilter defines criteria for selecting which routers to monitor
+type RouterFilter struct {
+	Labels map[string]string `json:"labels,omitempty"` // e.g., {"environment": "prod", "monitored": "true"}
 }
 
 // CreateConfig creates the default plugin configuration.
 func CreateConfig() *Config {
 	return &Config{
-		PollInterval: 		"5s", // 5 * time.Second
-		TrafficThreshold: 	1,
-		WindowSize:       	"5m",
-		MetricsURL:			"http://localhost:8080/metrics",
+		TrafficThreshold: 1,
+		WindowSize:      "5m",
+		MetricsURL:     "http://localhost:8080/metrics",
+		RouterFilter:    nil, // if nil, monitor all routers
+		testMode:        false,
 	}
 }
 
 // CloudSaver provider plugin to turn off cloud instances when traffic is below a threshold.
 type Provider struct {
-	name         string
-	pollInterval time.Duration
+	name            string
 	trafficThreshold float64
+	windowSize      time.Duration
+	routerFilter    *RouterFilter
 	metricsCollector *MetricsCollector
-	cancel func()
+	testMode        bool
+	cancel          func()
 }
 
 // type TrafficStats struct {
@@ -47,28 +56,46 @@ type Provider struct {
 
 // New creates a new Provider plugin.
 func New(_ context.Context, config *Config, name string) (*Provider, error) {
-	pi, err := time.ParseDuration(config.PollInterval)
+	windowSize, err := time.ParseDuration(config.WindowSize)
 	if err != nil {
-		return nil, fmt.Errorf("invalid poll interval: %w", err)
+		return nil, fmt.Errorf("invalid window size: %w", err)
+	}
+
+	// Basic configuration parsing validation
+	if windowSize < time.Minute && !config.testMode {
+		return nil, fmt.Errorf("window size must be at least 1 minute, got %v", windowSize)
 	}
 
 	collector := NewMetricsCollector(config.MetricsURL)
 	return &Provider{
-		name:         name,
-		pollInterval: pi,
+		name:            name,
+		windowSize:      windowSize,
 		trafficThreshold: config.TrafficThreshold,
+		routerFilter:    config.RouterFilter,
 		metricsCollector: collector,
+		testMode:         config.testMode,
 	}, nil
 }
 
 // Init the provider.
 func (p *Provider) Init() error {
-	if p.pollInterval <= 0 {
-		return errors.New("poll interval must be greater than 0")
+	// Runtime validation - ensures the plugin is in a valid state to start
+	if p.windowSize < time.Minute && !p.testMode {
+		return errors.New("window size must be at least 1 minute")
 	}
+
+	if p.trafficThreshold < 0 {
+		return errors.New("traffic threshold must be non-negative")
+	}
+
+	// Could add other runtime checks here, like:
+	// - Can we connect to the metrics URL?
+	// - Do we have necessary permissions?
+	// etc.
 
 	return nil
 }
+
 
 // Provide creates and send dynamic configuration.
 func (p *Provider) Provide(cfgChan chan<- json.Marshaler) error {
@@ -89,7 +116,7 @@ func (p *Provider) Provide(cfgChan chan<- json.Marshaler) error {
 }
 
 func (p *Provider) loadConfiguration(ctx context.Context, cfgChan chan<- json.Marshaler) {
-	ticker := time.NewTicker(p.pollInterval)
+	ticker := time.NewTicker(p.windowSize)
 	defer ticker.Stop()
 
 	for {
@@ -122,8 +149,14 @@ func (p *Provider) generateConfiguration() (*dynamic.JSONPayload, error) {
 		return nil, fmt.Errorf("failed to get service rates: %w", err)
 	}
 
-	// Log services below threshold
+	// Filter and log services below threshold
 	for serviceName, rate := range rates {
+		// Check if this service's router matches our filter
+		router := p.getRouterForService(serviceName)
+		if router == nil || !p.shouldMonitorRouter(router) {
+			continue
+		}
+
 		if rate.PerMin < p.trafficThreshold {
 			log.Printf("LOW TRAFFIC ALERT: Service %s is below threshold (%.2f < %.2f req/min)",
 				serviceName, rate.PerMin, p.trafficThreshold)
@@ -140,4 +173,20 @@ func (p *Provider) generateConfiguration() (*dynamic.JSONPayload, error) {
 			},
 		},
 	}, nil
+}
+
+// Get the router for a given service
+func (p *Provider) getRouterForService(serviceName string) *dynamic.Router {
+	// TODO: Implement router lookup logic here.  Need to design a filtering mechanism.
+	return nil
+}
+
+// Add a helper method to check if a router should be monitored
+func (p *Provider) shouldMonitorRouter(router *dynamic.Router) bool {
+	if p.routerFilter == nil {
+		return true // monitor all routers if no filter specified
+	}
+
+	// TODO: Implement router filter logic here.  Need to design a filtering mechanism.
+	return true
 }
