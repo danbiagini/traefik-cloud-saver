@@ -11,12 +11,12 @@ import (
 // Service implements cloud.Service interface for testing
 type Service struct {
 	scale     map[string]int32
-	mu        sync.RWMutex        // Protects scale map for concurrent access
+	mu        sync.RWMutex // Protects scale map for concurrent access
 	opCount   int
 	failAfter int
 	initError error
 	scaleErr  error
-	config    *cloud.ServiceConfig  // Add this if it's needed
+	config    *cloud.ServiceConfig
 }
 
 // ServiceOption allows configuring the mock service for different test scenarios
@@ -24,20 +24,24 @@ type ServiceOption func(*Service)
 
 // WithInitError configures the mock to return an error during initialization
 func WithInitError(err error) ServiceOption {
-	return func(p *Service) {
-		p.initError = err
+	return func(s *Service) {
+		s.initError = err
 	}
 }
 
 // WithScaleError configures the mock to return an error during scaling operations
 func WithScaleError(err error) ServiceOption {
-	return func(p *Service) {
-		p.scaleErr = err
+	return func(s *Service) {
+		s.scaleErr = err
 	}
 }
 
 // New creates a new mock service
-func New(_ *cloud.ServiceConfig, opts ...ServiceOption) (cloud.Service, error) {
+func New(config *cloud.ServiceConfig, opts ...ServiceOption) (cloud.Service, error) {
+	if config == nil {
+		return nil, fmt.Errorf("config is required")
+	}
+
 	mockConfig, ok := config.Provider.(*Config)
 	if !ok {
 		return nil, fmt.Errorf("invalid provider config type for mock service")
@@ -64,30 +68,30 @@ func New(_ *cloud.ServiceConfig, opts ...ServiceOption) (cloud.Service, error) {
 	return s, nil
 }
 
-func (p *Service) Initialize(_ *cloud.ServiceConfig) error {
-	if p.initError != nil {
-		return p.initError
+func (s *Service) Initialize(_ *cloud.ServiceConfig) error {
+	if s.initError != nil {
+		return s.initError
 	}
 	return nil
 }
 
-func (p *Service) checkFailure() error {
-	p.opCount++
-	if p.failAfter > 0 && p.opCount > p.failAfter {
-		return fmt.Errorf("mock service failed after %d operations", p.failAfter)
+func (s *Service) checkFailure() error {
+	s.opCount++
+	if s.failAfter > 0 && s.opCount > s.failAfter {
+		return fmt.Errorf("mock service failed after %d operations", s.failAfter)
 	}
 	return nil
 }
 
-func (p *Service) ScaleDown(_ context.Context, serviceName string) error {
-	if err := p.checkFailure(); err != nil {
+func (s *Service) ScaleDown(_ context.Context, serviceName string) error {
+	if err := s.checkFailure(); err != nil {
 		return err
 	}
 
-	p.mu.Lock()
-	defer p.mu.Unlock()
+	s.mu.Lock()
+	defer s.mu.Unlock()
 
-	current, exists := p.scale[serviceName]
+	current, exists := s.scale[serviceName]
 	if !exists {
 		return fmt.Errorf("service %s not found", serviceName)
 	}
@@ -96,38 +100,35 @@ func (p *Service) ScaleDown(_ context.Context, serviceName string) error {
 		return fmt.Errorf("service %s already at minimum scale", serviceName)
 	}
 
-	p.scale[serviceName] = current - 1
+	s.scale[serviceName] = current - 1
 	return nil
 }
 
-func (p *Service) ScaleUp(_ context.Context, serviceName string) error {
-	if p.scaleErr != nil {
-		return p.scaleErr
+func (s *Service) ScaleUp(_ context.Context, serviceName string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	cloud.LogProvider("mock", "scaling up service '%s' (current scale: %d)",
+		serviceName, s.scale[serviceName])
+
+	if s.scaleErr != nil {
+		cloud.LogProvider("mock", "error scaling up: %v", s.scaleErr)
+		return s.scaleErr
 	}
 
-	p.mu.Lock()
-	defer p.mu.Unlock()
-
-	current, exists := p.scale[serviceName]
-	if !exists {
-		// Initialize with scale of 1 if service doesn't exist
-		p.scale[serviceName] = 1
-		return nil
-	}
-
-	p.scale[serviceName] = current + 1
+	s.scale[serviceName]++
 	return nil
 }
 
-func (p *Service) GetCurrentScale(_ context.Context, serviceName string) (int32, error) {
-	if p.scaleErr != nil {
-		return 0, p.scaleErr
+func (s *Service) GetCurrentScale(_ context.Context, serviceName string) (int32, error) {
+	if s.scaleErr != nil {
+		return 0, s.scaleErr
 	}
 
-	p.mu.RLock()
-	defer p.mu.RUnlock()
+	s.mu.RLock()
+	defer s.mu.RUnlock()
 
-	scale, exists := p.scale[serviceName]
+	scale, exists := s.scale[serviceName]
 	if !exists {
 		return 0, fmt.Errorf("service %s not found", serviceName)
 	}

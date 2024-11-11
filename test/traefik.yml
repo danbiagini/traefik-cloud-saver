@@ -13,9 +13,15 @@ experimental:
 providers:
   plugin:
     traefik_cloud_saver:
-      pollInterval: 30s
+      windowSize: 1m
       metricsURL: http://localhost:8080/metrics
+      apiURL: http://localhost:8080/api
       trafficThreshold: 1
+      cloudProvider:
+        type: mock
+        projectID: "puckwax-schedule-helper"
+        zone: "us-central1-a"
+
   docker:
     endpoint: "unix:///var/run/docker.sock"
     exposedByDefault: false
