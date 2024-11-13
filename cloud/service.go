@@ -16,9 +16,10 @@ type Service interface {
 }
 
 const (
-	aws   = "aws"   // placeholder for future AWS implementation
-	gcp   = "gcp"   // active GCP implementation
-	azure = "azure" // placeholder for future Azure implementation
+	aws    = "aws"   // placeholder for future AWS implementation
+	gcp    = "gcp"   // active GCP implementation
+	azure  = "azure" // placeholder for future Azure implementation
+	mock_t = "mock"
 )
 
 // NewService creates a new cloud service based on configuration
@@ -30,6 +31,8 @@ func NewService(config *common.CloudServiceConfig) (Service, error) {
 		return nil, fmt.Errorf("GCP implementation not yet available")
 	case azure:
 		return nil, fmt.Errorf("AZURE implementation not yet available")
+	// case mock_t:
+	// return mock.New(config)
 	default:
 		return nil, fmt.Errorf("unknown cloud provider: %s", config.Type)
 	}

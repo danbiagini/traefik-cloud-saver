@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/danbiagini/traefik-cloud-saver/cloud"
 	"github.com/danbiagini/traefik-cloud-saver/cloud/common"
 )
 
@@ -38,7 +37,7 @@ func WithScaleError(err error) ServiceOption {
 }
 
 // New creates a new mock service
-func New(config *common.CloudServiceConfig, opts ...ServiceOption) (cloud.Service, error) {
+func New(config *common.CloudServiceConfig, opts ...ServiceOption) (*Service, error) {
 	if config == nil {
 		return nil, fmt.Errorf("config is required")
 	}
@@ -104,11 +103,11 @@ func (s *Service) ScaleUp(_ context.Context, serviceName string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	cloud.LogProvider("mock", "scaling up service '%s' (current scale: %d)",
+	common.LogProvider("mock", "scaling up service '%s' (current scale: %d)",
 		serviceName, s.scale[serviceName])
 
 	if s.scaleErr != nil {
-		cloud.LogProvider("mock", "error scaling up: %v", s.scaleErr)
+		common.LogProvider("mock", "error scaling up: %v", s.scaleErr)
 		return s.scaleErr
 	}
 

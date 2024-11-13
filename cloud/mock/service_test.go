@@ -4,8 +4,6 @@ import (
 	"context"
 	"errors"
 	"testing"
-
-	"github.com/danbiagini/traefik-cloud-saver/cloud"
 )
 
 func TestMockProvider(t *testing.T) {
