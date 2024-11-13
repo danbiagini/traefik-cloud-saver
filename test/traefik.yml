@@ -17,7 +17,8 @@ providers:
       metricsURL: http://localhost:8080/metrics
       apiURL: http://localhost:8080/api
       trafficThreshold: 1
-      cloudProvider:
+      debug: true
+      cloudConfig:
         type: mock
         projectID: "puckwax-schedule-helper"
         zone: "us-central1-a"
