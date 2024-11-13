@@ -42,6 +42,7 @@ func New(config *common.CloudServiceConfig, opts ...ServiceOption) (*Service, er
 		return nil, fmt.Errorf("config is required")
 	}
 
+	common.LogProvider("mock", "creating mock service")
 	s := &Service{
 		scale:     make(map[string]int32),
 		failAfter: config.FailAfter,

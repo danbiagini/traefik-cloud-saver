@@ -10,6 +10,8 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/danbiagini/traefik-cloud-saver/cloud"
+	"github.com/danbiagini/traefik-cloud-saver/cloud/common"
 	"github.com/traefik/genconf/dynamic"
 )
 
@@ -25,15 +27,22 @@ type CloudSaver struct {
 	windowSize       time.Duration
 	routerFilter     *RouterFilter
 	metricsCollector *MetricsCollector
-	// cloudService     cloud.Service
-	testMode bool
-	cancel   func()
-	apiURL   string
-	debug    bool
+	cloudService     cloud.Service
+	testMode         bool
+	cancel           func()
+	apiURL           string
+	debug            bool
 }
 
 // New creates a new Provider plugin.
 func New(_ context.Context, config *Config, name string) (*CloudSaver, error) {
+
+	if config == nil {
+		return nil, fmt.Errorf("config is nil")
+	}
+
+	common.LogProvider("traefik-cloud-saver", "cloud saver plugin created")
+
 	windowSize, err := time.ParseDuration(config.WindowSize)
 	if err != nil {
 		return nil, fmt.Errorf("invalid window size: %w", err)
@@ -45,6 +54,12 @@ func New(_ context.Context, config *Config, name string) (*CloudSaver, error) {
 	}
 
 	collector := NewMetricsCollector(config.MetricsURL)
+
+	service, err := cloud.NewService(config.CloudConfig)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create cloud service: %w", err)
+	}
+
 	return &CloudSaver{
 		name:             name,
 		windowSize:       windowSize,
@@ -54,6 +69,7 @@ func New(_ context.Context, config *Config, name string) (*CloudSaver, error) {
 		testMode:         config.testMode,
 		apiURL:           config.APIURL,
 		debug:            config.Debug,
+		cloudService:     service,
 	}, nil
 }
 

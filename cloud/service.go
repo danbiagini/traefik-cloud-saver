@@ -6,6 +6,7 @@ import (
 	"log"
 
 	"github.com/danbiagini/traefik-cloud-saver/cloud/common"
+	"github.com/danbiagini/traefik-cloud-saver/cloud/mock"
 )
 
 // Service interface defines operations that can be performed on cloud resources
@@ -31,8 +32,8 @@ func NewService(config *common.CloudServiceConfig) (Service, error) {
 		return nil, fmt.Errorf("GCP implementation not yet available")
 	case azure:
 		return nil, fmt.Errorf("AZURE implementation not yet available")
-	// case mock_t:
-	// return mock.New(config)
+	case mock_t:
+		return mock.New(config)
 	default:
 		return nil, fmt.Errorf("unknown cloud provider: %s", config.Type)
 	}
