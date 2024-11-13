@@ -10,7 +10,6 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/danbiagini/traefik-cloud-saver/cloud"
 	"github.com/traefik/genconf/dynamic"
 )
 
@@ -26,11 +25,11 @@ type CloudSaver struct {
 	windowSize       time.Duration
 	routerFilter     *RouterFilter
 	metricsCollector *MetricsCollector
-	cloudService     cloud.Service
-	testMode         bool
-	cancel           func()
-	apiURL           string
-	debug            bool
+	// cloudService     cloud.Service
+	testMode bool
+	cancel   func()
+	apiURL   string
+	debug    bool
 }
 
 // New creates a new Provider plugin.
@@ -214,10 +213,10 @@ func (p *CloudSaver) generateConfiguration() (*dynamic.JSONPayload, error) {
 }
 
 // Get the router for a given service
-func (p *CloudSaver) getRouterForService(serviceName string) *dynamic.Router {
-	// TODO: Implement router lookup logic here.  Need to design a filtering mechanism.
-	return nil
-}
+// func (p *CloudSaver) getRouterForService(_ string) *dynamic.Router {
+// 	// TODO: Implement router lookup logic here.  Need to design a filtering mechanism.
+// 	return nil
+// }
 
 // shouldMonitorRouter checks if a router should be monitored based on filter criteria
 func (p *CloudSaver) shouldMonitorRouter(routerName string) bool {

@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/danbiagini/traefik-cloud-saver/cloud"
+	"github.com/danbiagini/traefik-cloud-saver/cloud/common"
 	compute "google.golang.org/api/compute/v1"
 	"google.golang.org/api/option"
 )
@@ -20,7 +21,7 @@ type Service struct {
 // NewService creates a new GCP compute service implementation.
 // It requires a valid ServiceConfig with GCP-specific configuration
 // and credentials for authentication.
-func NewService(config *Config) (cloud.Service, error) {
+func NewService(config *common.CloudServiceConfig) (cloud.Service, error) {
 	if config == nil {
 		return nil, fmt.Errorf("invalid provider config type for GCP")
 	}
@@ -34,8 +35,8 @@ func NewService(config *Config) (cloud.Service, error) {
 
 	var options []option.ClientOption
 
-	if config.Base.Credentials.Secret != "" {
-		options = append(options, option.WithCredentialsJSON([]byte(config.Base.Credentials.Secret)))
+	if config.Credentials.Secret != "" {
+		options = append(options, option.WithCredentialsJSON([]byte(config.Credentials.Secret)))
 	} else {
 		log.Printf("No explicit credentials provided, using Application Default Credentials")
 	}
@@ -52,7 +53,7 @@ func NewService(config *Config) (cloud.Service, error) {
 	}, nil
 }
 
-func (s *Service) Initialize(_ *cloud.ServiceConfig) error {
+func (s *Service) Initialize(_ *common.CloudServiceConfig) error {
 	// Validate required fields
 	if s.projectID == "" {
 		return fmt.Errorf("GCP project ID is required")

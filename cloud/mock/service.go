@@ -6,6 +6,7 @@ import (
 	"sync"
 
 	"github.com/danbiagini/traefik-cloud-saver/cloud"
+	"github.com/danbiagini/traefik-cloud-saver/cloud/common"
 )
 
 // Service implements cloud.Service interface for testing
@@ -16,7 +17,7 @@ type Service struct {
 	failAfter int
 	initError error
 	scaleErr  error
-	config    *cloud.ServiceConfig
+	config    *common.CloudServiceConfig
 }
 
 // ServiceOption allows configuring the mock service for different test scenarios
@@ -37,25 +38,20 @@ func WithScaleError(err error) ServiceOption {
 }
 
 // New creates a new mock service
-func New(config *cloud.ServiceConfig, opts ...ServiceOption) (cloud.Service, error) {
+func New(config *common.CloudServiceConfig, opts ...ServiceOption) (cloud.Service, error) {
 	if config == nil {
 		return nil, fmt.Errorf("config is required")
 	}
 
-	mockConfig, ok := config.Provider.(*Config)
-	if !ok {
-		return nil, fmt.Errorf("invalid provider config type for mock service")
-	}
-
 	s := &Service{
 		scale:     make(map[string]int32),
-		failAfter: mockConfig.FailAfter,
+		failAfter: config.FailAfter,
 		config:    config,
 	}
 
 	// Initialize with any pre-configured scales
-	if mockConfig.InitialScale != nil {
-		for k, v := range mockConfig.InitialScale {
+	if config.InitialScale != nil {
+		for k, v := range config.InitialScale {
 			s.scale[k] = v
 		}
 	}
@@ -68,7 +64,7 @@ func New(config *cloud.ServiceConfig, opts ...ServiceOption) (cloud.Service, err
 	return s, nil
 }
 
-func (s *Service) Initialize(_ *cloud.ServiceConfig) error {
+func (s *Service) Initialize(_ *common.CloudServiceConfig) error {
 	if s.initError != nil {
 		return s.initError
 	}
