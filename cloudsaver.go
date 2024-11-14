@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log"
 	"net/http"
 	"time"
 
@@ -100,7 +99,7 @@ func (p *CloudSaver) Provide(cfgChan chan<- json.Marshaler) error {
 	go func() {
 		defer func() {
 			if err := recover(); err != nil {
-				log.Print(err)
+				common.LogProvider("traefik-cloud-saver", "ERROR: panic in provider: %v", err)
 			}
 		}()
 
@@ -119,7 +118,7 @@ func (p *CloudSaver) loadConfiguration(ctx context.Context, cfgChan chan<- json.
 		case <-ticker.C:
 			configuration, err := p.generateConfiguration()
 			if err != nil {
-				log.Printf("ERROR: Failed to generate configuration: %v", err)
+				common.LogProvider("traefik-cloud-saver", "ERROR: Failed to generate configuration: %v", err)
 				continue
 			}
 
@@ -172,6 +171,32 @@ func (p *CloudSaver) getRoutersFromAPI() (map[string]*TraefikRouter, error) {
 	return routerMap, nil
 }
 
+func (p *CloudSaver) getRouterForService(serviceName string) (string, error) {
+	resp, err := http.Get(p.apiURL + "/http/services/" + serviceName)
+	if err != nil {
+		return "", fmt.Errorf("failed to fetch information for service %s, err: %w", serviceName, err)
+	}
+	defer resp.Body.Close()
+
+	var serviceInfo map[string]interface{}
+	if err := json.NewDecoder(resp.Body).Decode(&serviceInfo); err != nil {
+		return "", fmt.Errorf("failed to decode service information: %w", err)
+	}
+
+	if p.debug {
+		common.LogProvider("traefik-cloud-saver", "DEBUG: usedBy type: %T, value: %v", serviceInfo["usedBy"], serviceInfo["usedBy"])
+	}
+
+	// the usedBy field is an array of strings, let's use the first one.
+	// TODO: handle multiple routers for the same service
+	usedBy, ok := serviceInfo["usedBy"].([]interface{})
+	if !ok || len(usedBy) == 0 {
+		return "", fmt.Errorf("service %s does not have usedBy field", serviceName)
+	}
+	routerName := usedBy[0].(string)
+	return routerName, nil
+}
+
 func (p *CloudSaver) generateConfiguration() (*dynamic.JSONPayload, error) {
 	// Get current service rates
 	rates, err := p.metricsCollector.GetServiceRates()
@@ -179,41 +204,31 @@ func (p *CloudSaver) generateConfiguration() (*dynamic.JSONPayload, error) {
 		return nil, fmt.Errorf("failed to get service rates: %w", err)
 	}
 
-	// Get router configurations
-	routers, err := p.getRoutersFromAPI()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get routers: %w", err)
-	}
-
-	// Create service to router mapping
 	serviceToRouter := make(map[string]string)
-	for _, router := range routers {
-		if router.Service != "" {
-			serviceToRouter[router.Service] = router.Name
-		}
-	}
-
-	// Filter and log services below threshold
+	// loop through each service and get the router name
 	for serviceName, rate := range rates {
-		routerName := serviceToRouter[serviceName]
-		if routerName == "" {
-			if p.debug {
-				log.Printf("Skipping service %s - no matching router found", serviceName)
-			}
+		routerName, err := p.getRouterForService(serviceName)
+		if err != nil {
+			common.LogProvider("traefik-cloud-saver", "ERROR: failed to get router for service %s, err: %s", serviceName, err)
 			continue
 		}
 
+		serviceToRouter[serviceName] = routerName
 		if !p.shouldMonitorRouter(routerName) {
-			if p.debug {
-				log.Printf("Skipping router %s - not in filter list", routerName)
-			}
+			common.LogProvider("traefik-cloud-saver", "Skipping router %s - not in filter list", routerName)
 			continue
 		}
 
 		if rate.PerMin < p.trafficThreshold {
-			log.Printf("LOW TRAFFIC ALERT: Service %s (router %s) is below threshold (%.2f < %.2f req/min)",
+			common.LogProvider("traefik-cloud-saver", "LOW TRAFFIC ALERT: Service %s (router %s) is below threshold (%.2f < %.2f req/min)",
 				serviceName, routerName, rate.PerMin, p.trafficThreshold)
-			// TODO: Add cloud scaling logic here
+			go func(serviceName string) {
+				ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+				defer cancel()
+				if err := p.cloudService.ScaleDown(ctx, serviceName); err != nil {
+					common.LogProvider("traefik-cloud-saver", "ERROR: failed to scale down service %s, err: %s", serviceName, err)
+				}
+			}(serviceName)
 		}
 	}
 

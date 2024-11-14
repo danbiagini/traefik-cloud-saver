@@ -22,4 +22,3 @@ services:
     labels:
       - traefik.enable=true
       - traefik.http.routers.whoami.rule=Host(`whoami.localhost`)
-      - traefik.http.services.whoami.loadbalancer.server.port=80

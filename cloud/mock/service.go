@@ -4,19 +4,21 @@ import (
 	"context"
 	"fmt"
 	"sync"
+	"time"
 
 	"github.com/danbiagini/traefik-cloud-saver/cloud/common"
 )
 
 // Service implements cloud.Service interface for testing
 type Service struct {
-	scale     map[string]int32
-	mu        sync.RWMutex // Protects scale map for concurrent access
-	opCount   int
-	failAfter int
-	initError error
-	scaleErr  error
-	config    *common.CloudServiceConfig
+	scale      map[string]int32
+	mu         sync.RWMutex // Protects scale map for concurrent access
+	opCount    int
+	failAfter  int
+	resetAfter time.Duration
+	initError  error
+	scaleErr   error
+	config     *common.CloudServiceConfig
 }
 
 // ServiceOption allows configuring the mock service for different test scenarios
@@ -42,11 +44,17 @@ func New(config *common.CloudServiceConfig, opts ...ServiceOption) (*Service, er
 		return nil, fmt.Errorf("config is required")
 	}
 
+	resetAfter, err := time.ParseDuration(config.ResetAfter)
+	if err != nil {
+		return nil, fmt.Errorf("invalid resetAfter: %w", err)
+	}
+
 	common.LogProvider("mock", "creating mock service")
 	s := &Service{
-		scale:     make(map[string]int32),
-		failAfter: config.FailAfter,
-		config:    config,
+		scale:      make(map[string]int32),
+		failAfter:  config.FailAfter,
+		config:     config,
+		resetAfter: resetAfter,
 	}
 
 	// Initialize with any pre-configured scales

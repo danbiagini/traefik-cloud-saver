@@ -1,8 +1,6 @@
 package traefik_cloud_saver
 
 import (
-	"os"
-
 	"github.com/danbiagini/traefik-cloud-saver/cloud/common"
 )
 
@@ -20,7 +18,6 @@ type Config struct {
 
 // CreateConfig creates the default plugin configuration.
 func CreateConfig() *Config {
-	os.Stdout.WriteString("DEBUG: CreateConfig\n") // nolint:errcheck
 	return &Config{
 		TrafficThreshold: 1,
 		WindowSize:       "5m",

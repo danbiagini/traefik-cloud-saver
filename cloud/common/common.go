@@ -27,6 +27,7 @@ type CloudServiceConfig struct {
 	// Mock-specific fields
 	InitialScale map[string]int32 `json:"initialScale,omitempty"`
 	FailAfter    int              `json:"failAfter,omitempty"`
+	ResetAfter   string           `json:"resetAfter,omitempty"`
 }
 
 // LogProvider is a simple helper for consistent cloud provider logging
