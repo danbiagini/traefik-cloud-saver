@@ -44,9 +44,13 @@ func New(config *common.CloudServiceConfig, opts ...ServiceOption) (*Service, er
 		return nil, fmt.Errorf("config is required")
 	}
 
-	resetAfter, err := time.ParseDuration(config.ResetAfter)
-	if err != nil {
-		return nil, fmt.Errorf("invalid resetAfter: %w", err)
+	resetAfter := time.Duration(0)
+	if config.ResetAfter != "" {
+		var err error
+		resetAfter, err = time.ParseDuration(config.ResetAfter)
+		if err != nil {
+			return nil, fmt.Errorf("invalid resetAfter: %w", err)
+		}
 	}
 
 	common.LogProvider("mock", "creating mock service")

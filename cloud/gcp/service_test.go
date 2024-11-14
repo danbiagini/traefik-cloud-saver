@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/danbiagini/traefik-cloud-saver/cloud"
+	"github.com/danbiagini/traefik-cloud-saver/cloud/common"
 	compute "google.golang.org/api/compute/v1"
 	"google.golang.org/api/option"
 )
@@ -222,45 +222,42 @@ func TestNewService(t *testing.T) {
 
 	tests := []struct {
 		name      string
-		config    *Config
+		config    *common.CloudServiceConfig
 		wantErr   bool
 		errString string
 	}{
 		{
 			name: "valid config with credentials",
-			config: &Config{
-				Base: cloud.ServiceConfig{
-					Credentials: cloud.CredentialsConfig{
-						Secret: mockCreds,
-					},
+			config: &common.CloudServiceConfig{
+				Credentials: &common.CredentialsConfig{
+					Secret: mockCreds,
 				},
 				ProjectID: "test-project",
 				Zone:      "test-zone",
+				Type:      "gcp",
 			},
 			wantErr: false,
 		},
 		{
 			name: "missing project ID",
-			config: &Config{
-				Base: cloud.ServiceConfig{
-					Credentials: cloud.CredentialsConfig{
-						Secret: mockCreds,
-					},
+			config: &common.CloudServiceConfig{
+				Credentials: &common.CredentialsConfig{
+					Secret: mockCreds,
 				},
 				Zone: "test-zone",
+				Type: "gcp",
 			},
 			wantErr:   true,
-			errString: "projectId is required",
+			errString: "projectID is required",
 		},
 		{
 			name: "missing zone",
-			config: &Config{
-				Base: cloud.ServiceConfig{
-					Credentials: cloud.CredentialsConfig{
-						Secret: mockCreds,
-					},
+			config: &common.CloudServiceConfig{
+				Credentials: &common.CredentialsConfig{
+					Secret: mockCreds,
 				},
 				ProjectID: "test-project",
+				Type:      "gcp",
 			},
 			wantErr:   true,
 			errString: "zone is required",

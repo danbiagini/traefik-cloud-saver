@@ -4,15 +4,16 @@ import (
 	"context"
 	"errors"
 	"testing"
+
+	"github.com/danbiagini/traefik-cloud-saver/cloud/common"
 )
 
 func TestMockProvider(t *testing.T) {
 	ctx := context.Background()
 
 	t.Run("basic scaling operations", func(t *testing.T) {
-		config := &cloud.ServiceConfig{
-			Type:     "mock",
-			Provider: &Config{},
+		config := &common.CloudServiceConfig{
+			Type: "mock",
 		}
 
 		provider, err := New(config)
@@ -52,9 +53,8 @@ func TestMockProvider(t *testing.T) {
 
 	t.Run("error simulation", func(t *testing.T) {
 		expectedErr := errors.New("simulated error")
-		config := &cloud.ServiceConfig{
-			Type:     "mock",
-			Provider: &Config{},
+		config := &common.CloudServiceConfig{
+			Type: "mock",
 		}
 
 		provider, err := New(config, WithScaleError(expectedErr))
@@ -69,9 +69,8 @@ func TestMockProvider(t *testing.T) {
 	})
 
 	t.Run("concurrent access", func(t *testing.T) {
-		config := &cloud.ServiceConfig{
-			Type:     "mock",
-			Provider: &Config{},
+		config := &common.CloudServiceConfig{
+			Type: "mock",
 		}
 
 		provider, err := New(config)
@@ -79,14 +78,8 @@ func TestMockProvider(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		// Type assert the provider to access the mock-specific methods
-		mockProvider, ok := provider.(*Service)
-		if !ok {
-			t.Fatal("provider is not a mock.Service")
-		}
-
 		serviceName := "concurrent-service"
-		mockProvider.SetScale(serviceName, 5) // Now using the concrete type
+		provider.SetScale(serviceName, 5) // Now using the concrete type
 
 		// Run concurrent scale operations
 		done := make(chan bool)
