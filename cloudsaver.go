@@ -183,10 +183,6 @@ func (p *CloudSaver) getRouterForService(serviceName string) (string, error) {
 		return "", fmt.Errorf("failed to decode service information: %w", err)
 	}
 
-	if p.debug {
-		common.LogProvider("traefik-cloud-saver", "DEBUG: usedBy type: %T, value: %v", serviceInfo["usedBy"], serviceInfo["usedBy"])
-	}
-
 	// the usedBy field is an array of strings, let's use the first one.
 	// TODO: handle multiple routers for the same service
 	usedBy, ok := serviceInfo["usedBy"].([]interface{})
@@ -215,7 +211,7 @@ func (p *CloudSaver) generateConfiguration() (*dynamic.JSONPayload, error) {
 
 		serviceToRouter[serviceName] = routerName
 		if !p.shouldMonitorRouter(routerName) {
-			common.LogProvider("traefik-cloud-saver", "Skipping router %s - not in filter list", routerName)
+			common.LogProvider("traefik-cloud-saver", "Skipping router %s - not in monitor list", routerName)
 			continue
 		}
 

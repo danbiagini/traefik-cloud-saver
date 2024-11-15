@@ -39,15 +39,15 @@ func WithScaleError(err error) ServiceOption {
 }
 
 // New creates a new mock service
-func New(config *common.CloudServiceConfig, opts ...ServiceOption) (*Service, error) {
-	if config == nil {
+func New(cloudConfig *common.CloudServiceConfig, opts ...ServiceOption) (*Service, error) {
+	if cloudConfig == nil {
 		return nil, fmt.Errorf("config is required")
 	}
 
 	resetAfter := time.Duration(0)
-	if config.ResetAfter != "" {
+	if cloudConfig.ResetAfter != "" {
 		var err error
-		resetAfter, err = time.ParseDuration(config.ResetAfter)
+		resetAfter, err = time.ParseDuration(cloudConfig.ResetAfter)
 		if err != nil {
 			return nil, fmt.Errorf("invalid resetAfter: %w", err)
 		}
@@ -56,16 +56,21 @@ func New(config *common.CloudServiceConfig, opts ...ServiceOption) (*Service, er
 	common.LogProvider("mock", "creating mock service")
 	s := &Service{
 		scale:      make(map[string]int32),
-		failAfter:  config.FailAfter,
-		config:     config,
+		failAfter:  cloudConfig.FailAfter,
+		config:     cloudConfig,
 		resetAfter: resetAfter,
 	}
 
 	// Initialize with any pre-configured scales
-	if config.InitialScale != nil {
-		for k, v := range config.InitialScale {
-			s.scale[k] = v
-		}
+	s.Reset()
+
+	// Start a reset timer which will reset the scale to the initial values
+	// after the configured duration
+	if s.resetAfter > 0 {
+		go func() {
+			time.Sleep(s.resetAfter)
+			s.Reset()
+		}()
 	}
 
 	// Apply any configuration options
@@ -105,7 +110,8 @@ func (s *Service) ScaleDown(_ context.Context, serviceName string) error {
 	}
 
 	if current <= 0 {
-		return fmt.Errorf("service %s already at minimum scale", serviceName)
+		common.LogProvider("mock", "service %s already at minimum scale", serviceName)
+		return nil
 	}
 
 	s.scale[serviceName] = current - 1
@@ -155,9 +161,14 @@ func (p *Service) SetScale(serviceName string, scale int32) {
 
 // Reset clears all stored scales and errors
 func (p *Service) Reset() {
+	common.LogProvider("mock", "resetting scale values for mock service")
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	p.scale = make(map[string]int32)
 	p.initError = nil
 	p.scaleErr = nil
+
+	for k, v := range p.config.InitialScale {
+		p.scale[k] = v
+	}
 }

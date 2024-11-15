@@ -22,3 +22,10 @@ services:
     labels:
       - traefik.enable=true
       - traefik.http.routers.whoami.rule=Host(`whoami.localhost`)
+  whoami-2:
+    image: traefik/whoami
+    ports:
+      - "8082:80"
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.whoami-2.rule=Host(`whoami-2.localhost`)

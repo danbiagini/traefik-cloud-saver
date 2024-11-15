@@ -26,7 +26,7 @@ const (
 // NewService creates a new cloud service based on configuration
 func NewService(config *common.CloudServiceConfig) (Service, error) {
 	switch config.Type {
-	case "aws":
+	case aws:
 		return nil, fmt.Errorf("AWS implementation not yet available")
 	case gcp:
 		return nil, fmt.Errorf("GCP implementation not yet available")

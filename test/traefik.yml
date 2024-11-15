@@ -22,10 +22,10 @@ providers:
         type: mock
         projectID: "puckwax-schedule-helper"
         zone: "us-central1-a"
-        resetAfter: 5m
+        resetAfter: 2m
         initialScale:
           whoami-test@docker: 1
-          whoami2@docker: 1
+          whoami-2-test@docker: 3
 
   docker:
     endpoint: "unix:///var/run/docker.sock"
