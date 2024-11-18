@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"testing"
 	"time"
 
@@ -14,12 +15,16 @@ import (
 
 func setupMockService(handler http.Handler) (*Service, *httptest.Server) {
 	ts := httptest.NewServer(handler)
-
 	fmt.Printf("Test server URL: %s\n", ts.URL)
 
-	timeout := 5 * time.Second
-	authToken := "test-token"
-	compute, err := NewComputeClient(&ts.URL, &authToken, &timeout)
+	// Use testTokenManager from testhelpers_test.go
+	tokenManager, err := testTokenManager(ts)
+	if err != nil {
+		log.Fatalf("Failed to create token manager: %v", err)
+	}
+
+	baseURL := ts.URL + "/compute/v1"
+	compute, err := NewComputeClient(&baseURL, tokenManager, WithTimeout(5*time.Second))
 	if err != nil {
 		log.Fatalf("Failed to create compute client: %v", err)
 	}
@@ -45,7 +50,7 @@ func TestGetCurrentScale(t *testing.T) {
 			name:         "running_instance",
 			instanceName: "test-instance",
 			setupMock: func(mux *http.ServeMux) {
-				mux.HandleFunc("/projects/test-project/zones/test-zone/instances/test-instance", func(w http.ResponseWriter, r *http.Request) {
+				mux.HandleFunc("/compute/v1/projects/test-project/zones/test-zone/instances/test-instance", func(w http.ResponseWriter, r *http.Request) {
 					w.Header().Set("Content-Type", "application/json")
 					w.Write([]byte(`{"status": "RUNNING", "name": "test-instance"}`))
 				})
@@ -57,7 +62,7 @@ func TestGetCurrentScale(t *testing.T) {
 			name:         "stopped_instance",
 			instanceName: "test-instance",
 			setupMock: func(mux *http.ServeMux) {
-				mux.HandleFunc("/projects/test-project/zones/test-zone/instances/test-instance", func(w http.ResponseWriter, r *http.Request) {
+				mux.HandleFunc("/compute/v1/projects/test-project/zones/test-zone/instances/test-instance", func(w http.ResponseWriter, r *http.Request) {
 					w.Header().Set("Content-Type", "application/json")
 					w.Write([]byte(`{"status": "TERMINATED", "name": "test-instance"}`))
 				})
@@ -69,7 +74,7 @@ func TestGetCurrentScale(t *testing.T) {
 			name:         "transitional_state",
 			instanceName: "test-instance",
 			setupMock: func(mux *http.ServeMux) {
-				mux.HandleFunc("/projects/test-project/zones/test-zone/instances/test-instance", func(w http.ResponseWriter, r *http.Request) {
+				mux.HandleFunc("/compute/v1/projects/test-project/zones/test-zone/instances/test-instance", func(w http.ResponseWriter, r *http.Request) {
 					w.Header().Set("Content-Type", "application/json")
 					w.Write([]byte(`{"status": "STOPPING", "name": "test-instance"}`))
 				})
@@ -82,9 +87,20 @@ func TestGetCurrentScale(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			mux := http.NewServeMux()
+
+			// Keep the token endpoint at /token
+			mux.HandleFunc("/token", func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				w.Write([]byte(`{"access_token":"test-token","token_type":"Bearer","expires_in":3600}`))
+			})
+
+			// Add the test case's handlers
 			tt.setupMock(mux)
 
+			// Create service with the correct token URL
 			svc, ts := setupMockService(mux)
+			// Update the token URL to include the path
+			svc.compute.tokenManager.credentials.TokenURL = ts.URL + "/token"
 			defer ts.Close()
 
 			got, err := svc.GetCurrentScale(context.Background(), tt.instanceName)
@@ -108,18 +124,18 @@ func TestScaleUp(t *testing.T) {
 }
 
 func TestNewService(t *testing.T) {
-	mockCreds := `{
-		"type": "service_account",
-		"project_id": "test-project",
-		"private_key_id": "mock-key-id",
-		"private_key": "-----BEGIN PRIVATE KEY-----\nmock-key\n-----END PRIVATE KEY-----\n",
-		"client_email": "test@test-project.iam.gserviceaccount.com",
-		"client_id": "123456789",
-		"auth_uri": "https://accounts.google.com/o/oauth2/auth",
-		"token_uri": "https://oauth2.googleapis.com/token",
-		"auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
-		"client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/test@test-project.iam.gserviceaccount.com"
-	}`
+	// Create temporary credentials files
+	tmpFile, err := testCredentialsFile()
+	if err != nil {
+		t.Fatalf("Failed to create credentials file: %v", err)
+	}
+	defer os.Remove(tmpFile)
+
+	tmpFileNoProjectID, err := testCredentialsFileNoProjectID()
+	if err != nil {
+		t.Fatalf("Failed to create credentials file: %v", err)
+	}
+	defer os.Remove(tmpFileNoProjectID)
 
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -137,8 +153,8 @@ func TestNewService(t *testing.T) {
 			name: "valid config with credentials",
 			config: &common.CloudServiceConfig{
 				Credentials: &common.CredentialsConfig{
-					Secret: mockCreds,
-					Type:   "token",
+					Secret: tmpFile, // Use the temp file path instead of the JSON string
+					Type:   "service_account",
 				},
 				ProjectID: "test-project",
 				Zone:      "test-zone",
@@ -152,8 +168,8 @@ func TestNewService(t *testing.T) {
 			name: "missing project ID",
 			config: &common.CloudServiceConfig{
 				Credentials: &common.CredentialsConfig{
-					Secret: mockCreds,
-					Type:   "token",
+					Secret: tmpFileNoProjectID,
+					Type:   "service_account",
 				},
 				Zone:   "test-zone",
 				Region: "test-region",
@@ -166,8 +182,8 @@ func TestNewService(t *testing.T) {
 			name: "missing zone",
 			config: &common.CloudServiceConfig{
 				Credentials: &common.CredentialsConfig{
-					Secret: mockCreds,
-					Type:   "token",
+					Secret: tmpFile,
+					Type:   "service_account",
 				},
 				ProjectID: "test-project",
 				Region:    "test-region",

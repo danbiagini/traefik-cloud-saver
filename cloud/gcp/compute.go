@@ -16,7 +16,7 @@ const computeBasePath = "https://compute.googleapis.com/compute/v1"
 type ComputeClient struct {
 	client       *http.Client
 	baseURL      string
-	authToken    string
+	tokenManager *TokenManager
 	timeout      time.Duration
 	pollInterval time.Duration
 }
@@ -25,6 +25,14 @@ type ComputeClient struct {
 type Instance struct {
 	Name   string `json:"name"`
 	Status string `json:"status"`
+}
+
+type ComputeClientOption func(*ComputeClient)
+
+func WithTimeout(timeout time.Duration) ComputeClientOption {
+	return func(c *ComputeClient) {
+		c.timeout = timeout
+	}
 }
 
 // Operation represents a GCP compute operation
@@ -38,32 +46,29 @@ type Operation struct {
 	} `json:"error,omitempty"`
 }
 
-func NewComputeClient(baseURL *string, authToken *string, timeout *time.Duration) (*ComputeClient, error) {
+func NewComputeClient(baseURL *string, tokenManager *TokenManager, options ...ComputeClientOption) (*ComputeClient, error) {
 	base := computeBasePath
 	if baseURL != nil {
 		base = *baseURL
 	}
 
-	t := 5 * time.Minute // default timeout
-	if timeout != nil {
-		t = *timeout
+	if tokenManager == nil {
+		return nil, fmt.Errorf("token manager is required")
 	}
 
-	// Require explicit auth token
-	if authToken == nil || *authToken == "" {
-		return nil, fmt.Errorf("auth token is required")
-	}
-	auth := *authToken
-
-	client := &http.Client{}
-
-	return &ComputeClient{
-		client:       client,
+	c := &ComputeClient{
 		baseURL:      base,
-		authToken:    auth,
-		timeout:      t,
+		tokenManager: tokenManager,
+		client:       &http.Client{},
+		timeout:      5 * time.Minute,
 		pollInterval: 10 * time.Second,
-	}, nil
+	}
+
+	for _, option := range options {
+		option(c)
+	}
+
+	return c, nil
 }
 
 func (c *ComputeClient) doRequest(ctx context.Context, method, urlPath string, body interface{}) ([]byte, error) {
@@ -83,9 +88,12 @@ func (c *ComputeClient) doRequest(ctx context.Context, method, urlPath string, b
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
 
-	if c.authToken != "" {
-		req.Header.Set("Authorization", "Bearer "+c.authToken)
+	// Get token from token manager
+	token, err := c.tokenManager.GetToken(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get auth token: %w", err)
 	}
+	req.Header.Set("Authorization", "Bearer "+token)
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := c.client.Do(req)
@@ -100,6 +108,21 @@ func (c *ComputeClient) doRequest(ctx context.Context, method, urlPath string, b
 	}
 
 	if resp.StatusCode >= 400 {
+		// Try to parse GCP error response
+		var gcpError struct {
+			Error struct {
+				Message string `json:"message"`
+				Errors  []struct {
+					Message string `json:"message"`
+				} `json:"errors"`
+			} `json:"error"`
+		}
+
+		if err := json.Unmarshal(respBody, &gcpError); err == nil && gcpError.Error.Message != "" {
+			return nil, fmt.Errorf("%s", gcpError.Error.Message)
+		}
+
+		// Fallback to simple error if can't parse GCP error format
 		return nil, fmt.Errorf("request failed with status %d: %s", resp.StatusCode, string(respBody))
 	}
 
@@ -122,46 +145,38 @@ func (c *ComputeClient) GetInstance(ctx context.Context, projectID, zone, instan
 	return &result, nil
 }
 
-// StopInstance stops the instance and waits for it to reach a terminal state
-func (c *ComputeClient) StopInstance(ctx context.Context, projectID, zone, instance string) (*Operation, error) {
-	urlPath := path.Join("projects", projectID, "zones", zone, "instances", instance, "stop")
-
+// StopInstance stops the instance and waits for the operation to complete
+func (c *ComputeClient) StopInstance(ctx context.Context, projectID, zone, instanceName string) (*Operation, error) {
+	// First, make the stop request
+	urlPath := path.Join("projects", projectID, "zones", zone, "instances", instanceName, "stop")
 	respBody, err := c.doRequest(ctx, http.MethodPost, urlPath, nil)
 	if err != nil {
 		return nil, err
 	}
 
+	// Get the operation from the response
 	var operation Operation
 	if err := json.Unmarshal(respBody, &operation); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal operation response: %w", err)
 	}
 
-	if operation.Error != nil && len(operation.Error.Errors) > 0 {
-		return nil, fmt.Errorf("operation failed: %s", operation.Error.Errors[0].Message)
+	// Wait for the operation to complete using its name
+	op, err := c.waitForOperation(ctx, projectID, zone, operation.Name)
+	if err != nil {
+		return nil, err
 	}
 
-	// Wait for the instance to stop
-	timeout := time.After(c.timeout)
-	ticker := time.NewTicker(c.pollInterval)
-	defer ticker.Stop()
-
-	for {
-		select {
-		case <-ctx.Done():
-			return nil, ctx.Err()
-		case <-timeout:
-			return nil, fmt.Errorf("timeout waiting for instance to stop")
-		case <-ticker.C:
-			instance, err := c.GetInstance(ctx, projectID, zone, instance)
-			if err != nil {
-				return nil, fmt.Errorf("failed to get instance status: %w", err)
-			}
-			if instance.Status == "TERMINATED" || instance.Status == "STOPPED" {
-				operation.Status = instance.Status
-				return &operation, nil
-			}
-		}
+	// Verify the instance state after the operation completes
+	instance, err := c.GetInstance(ctx, projectID, zone, instanceName)
+	if err != nil {
+		return nil, err
 	}
+
+	if instance.Status != "TERMINATED" {
+		return nil, fmt.Errorf("instance failed to stop: status is %s", instance.Status)
+	}
+
+	return op, nil
 }
 
 func (c *ComputeClient) GetOperation(ctx context.Context, projectID, zone, operation string) (*Operation, error) {
@@ -178,4 +193,38 @@ func (c *ComputeClient) GetOperation(ctx context.Context, projectID, zone, opera
 	}
 
 	return &result, nil
+}
+
+func (c *ComputeClient) waitForOperation(ctx context.Context, projectID, zone, operationName string) (*Operation, error) {
+	ctx, cancel := context.WithTimeout(ctx, c.timeout)
+	defer cancel()
+
+	ticker := time.NewTicker(c.pollInterval)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return nil, fmt.Errorf("timeout waiting for operation to complete: %w", ctx.Err())
+		case <-ticker.C:
+			urlPath := path.Join("projects", projectID, "zones", zone, "operations", operationName)
+
+			respBody, err := c.doRequest(ctx, http.MethodGet, urlPath, nil)
+			if err != nil {
+				return nil, fmt.Errorf("failed to get operation status: %w", err)
+			}
+
+			var operation Operation
+			if err := json.Unmarshal(respBody, &operation); err != nil {
+				return nil, fmt.Errorf("failed to decode operation response: %w", err)
+			}
+
+			if operation.Status == "DONE" {
+				if operation.Error != nil {
+					return nil, fmt.Errorf("operation failed: %v", operation.Error)
+				}
+				return &operation, nil
+			}
+		}
+	}
 }

@@ -29,6 +29,7 @@ type Credentials struct {
 	PrivateKeyID string `json:"private_key_id"`
 	PrivateKey   string `json:"private_key"`
 	TokenURL     string `json:"token_uri"`
+	ProjectID    string `json:"project_id"`
 }
 
 type TokenManager struct {

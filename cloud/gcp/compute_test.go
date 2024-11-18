@@ -15,7 +15,16 @@ import (
 )
 
 func setupTestServer(handler http.HandlerFunc) (*httptest.Server, *ComputeClient) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	mux := http.NewServeMux()
+
+	// Handle token endpoint to match token_uri in credentials
+	mux.HandleFunc("/oauth2/token", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte(`{"access_token":"test-token","token_type":"Bearer","expires_in":3600}`))
+	})
+
+	// Handle compute endpoints
+	mux.HandleFunc("/compute/", func(w http.ResponseWriter, r *http.Request) {
 		// Verify request headers
 		if auth := r.Header.Get("Authorization"); auth != "Bearer test-token" {
 			w.WriteHeader(http.StatusUnauthorized)
@@ -33,13 +42,20 @@ func setupTestServer(handler http.HandlerFunc) (*httptest.Server, *ComputeClient
 		w.Header().Set("Content-Type", "application/json")
 		w.Header().Set("X-GoogApis-Metadata", "service=compute")
 
-		// Call the original handler
+		// Call the handler for all requests
 		handler(w, r)
-	}))
+	})
 
-	var authToken = "test-token"
+	server := httptest.NewServer(mux)
+
+	// Create token manager using the same server
+	tokenManager, err := testTokenManager(server)
+	if err != nil {
+		log.Fatalf("Failed to create token manager: %v", err)
+	}
+
 	var baseURL = server.URL + "/compute/v1"
-	client, err := NewComputeClient(&baseURL, &authToken, nil)
+	client, err := NewComputeClient(&baseURL, tokenManager, WithTimeout(5*time.Second))
 	if err != nil {
 		log.Fatalf("Failed to create compute client: %v", err)
 	}
@@ -99,91 +115,125 @@ func TestGetInstance(t *testing.T) {
 }
 
 func TestComputeClient_StopInstance(t *testing.T) {
-	// Setup test cases
 	tests := []struct {
-		name          string
-		responses     []string // JSON responses from the server
+		name      string
+		responses map[string]struct {
+			status int
+			body   string
+		}
 		expectedError string
 		timeout       time.Duration
 	}{
 		{
 			name: "successful stop",
-			responses: []string{
-				`{"name": "operation-123", "status": "RUNNING"}`, // Stop operation response
-				`{"name": "instance-1", "status": "STOPPING"}`,   // First status check
-				`{"name": "instance-1", "status": "TERMINATED"}`, // Second status check
+			responses: map[string]struct {
+				status int
+				body   string
+			}{
+				"instances/instance-1/stop": {
+					status: http.StatusOK,
+					body:   `{"name": "operation-123"}`,
+				},
+				"operations/operation-123": {
+					status: http.StatusOK,
+					body:   `{"status": "DONE"}`,
+				},
+				"instances/instance-1": {
+					status: http.StatusOK,
+					body:   `{"name": "instance-1", "status": "TERMINATED"}`,
+				},
 			},
-			timeout: 1 * time.Second,
+			timeout: 2 * time.Second,
 		},
 		{
-			name: "timeout while stopping",
-			responses: []string{
-				`{"name": "operation-123", "status": "RUNNING"}`,
-				`{"name": "instance-1", "status": "STOPPING"}`,
-				`{"name": "instance-1", "status": "STOPPING"}`,
+			name: "error during status check",
+			responses: map[string]struct {
+				status int
+				body   string
+			}{
+				"instances/instance-1/stop": {
+					status: http.StatusOK,
+					body:   `{"name": "operation-123"}`,
+				},
+				"operations/operation-123": {
+					status: http.StatusForbidden,
+					body:   `{"error": {"message": "request failed with status 403"}}`,
+				},
+				"instances/instance-1": {
+					status: http.StatusOK,
+					body:   `{"name": "instance-1", "status": "RUNNING"}`,
+				},
 			},
-			expectedError: "timeout waiting for instance to stop",
-			timeout:       100 * time.Millisecond,
+			expectedError: "request failed with status 403",
+			timeout:       1 * time.Second,
 		},
 		{
 			name: "error response from stop operation",
-			responses: []string{
-				`{"error": {"errors": [{"message": "Instance not found"}]}}`,
+			responses: map[string]struct {
+				status int
+				body   string
+			}{
+				"instances/instance-1/stop": {
+					status: http.StatusOK,
+					body:   `{"name": "operation-123"}`,
+				},
+				"operations/operation-123": {
+					status: http.StatusOK,
+					body:   `{"status": "DONE"}`,
+				},
+				"instances/instance-1": {
+					status: http.StatusNotFound,
+					body:   `{"error": {"code": 404, "message": "Instance not found"}}`,
+				},
 			},
 			expectedError: "Instance not found",
 			timeout:       1 * time.Second,
 		},
 		{
-			name: "error during status check",
-			responses: []string{
-				`{"name": "operation-123", "status": "RUNNING"}`,
-				`{
-					"error": {
-						"code": 403,
-						"message": "The client does not have sufficient permission",
-						"errors": [
-							{
-								"message": "The client does not have sufficient permission",
-								"domain": "global",
-								"reason": "forbidden"
-							}
-						],
-						"status": "PERMISSION_DENIED"
-					}
-				}`,
+			name: "timeout while stopping",
+			responses: map[string]struct {
+				status int
+				body   string
+			}{
+				"instances/instance-1/stop": {
+					status: http.StatusOK,
+					body:   `{"name": "operation-123"}`,
+				},
+				"operations/operation-123": {
+					status: http.StatusOK,
+					body:   `{"status": "RUNNING"}`,
+				},
+				"instances/instance-1": {
+					status: http.StatusOK,
+					body:   `{"name": "instance-1", "status": "STOPPING"}`,
+				},
 			},
-			expectedError: "failed to get instance status",
-			timeout:       1 * time.Second,
+			expectedError: "context deadline exceeded",
+			timeout:       100 * time.Millisecond,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			var requestCount int
 			handler := func(w http.ResponseWriter, r *http.Request) {
-				var response string
-				if requestCount >= len(tt.responses) {
-					response = tt.responses[len(tt.responses)-1]
-				} else {
-					response = tt.responses[requestCount]
+				parts := strings.Split(r.URL.Path, "/compute/v1/projects/test-project/zones/test-zone/")
+				if len(parts) != 2 {
+					t.Logf("Invalid path format: %s", r.URL.Path)
+					w.WriteHeader(http.StatusBadRequest)
+					return
 				}
-				// Check if this is an error response
-				if strings.Contains(response, `"error"`) {
-					var errorResp struct {
-						Error struct {
-							Code    int    `json:"code"`
-							Message string `json:"message"`
-						} `json:"error"`
-					}
-					if err := json.Unmarshal([]byte(response), &errorResp); err == nil && errorResp.Error.Code != 0 {
-						w.WriteHeader(errorResp.Error.Code)
-					} else {
-						w.WriteHeader(http.StatusBadRequest)
-					}
+				pathSuffix := parts[1]
+
+				response, exists := tt.responses[pathSuffix]
+				if !exists {
+					t.Logf("No response configured for path: %s", pathSuffix)
+					w.WriteHeader(http.StatusNotFound)
+					return
 				}
 
-				_, _ = w.Write([]byte(response))
-				requestCount++
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(response.status)
+				w.Write([]byte(response.body))
 			}
 
 			server, client := setupTestServer(handler)
@@ -196,6 +246,10 @@ func TestComputeClient_StopInstance(t *testing.T) {
 			op, err := client.StopInstance(context.Background(), "test-project", "test-zone", "instance-1")
 
 			if tt.expectedError != "" {
+				if err == nil {
+					t.Errorf("Expected error containing %q, got nil", tt.expectedError)
+					return
+				}
 				assert.Error(t, err)
 				assert.Contains(t, err.Error(), tt.expectedError)
 				return
@@ -203,7 +257,7 @@ func TestComputeClient_StopInstance(t *testing.T) {
 
 			require.NoError(t, err)
 			require.NotNil(t, op)
-			assert.Equal(t, "TERMINATED", op.Status)
+			assert.Equal(t, "DONE", op.Status)
 		})
 	}
 }

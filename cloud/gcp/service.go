@@ -2,7 +2,9 @@ package gcp
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"os"
 
 	"github.com/danbiagini/traefik-cloud-saver/cloud/common"
 )
@@ -16,14 +18,37 @@ type Service struct {
 	config    *common.CloudServiceConfig
 }
 
-func New(config *common.CloudServiceConfig) (*Service, error) {
-
-	if config == nil {
-		return nil, fmt.Errorf("config can't be nil for GCP")
+// loadServiceAccountCredentials loads credentials from a service account JSON file
+func loadServiceAccountCredentials(path string) (*Credentials, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read service account file: %w", err)
 	}
 
-	if config.ProjectID == "" {
-		return nil, fmt.Errorf("project ID is required for GCP")
+	var serviceAccount struct {
+		Type         string `json:"type"`
+		ClientEmail  string `json:"client_email"`
+		PrivateKey   string `json:"private_key"`
+		PrivateKeyID string `json:"private_key_id"`
+		ProjectID    string `json:"project_id"`
+	}
+
+	if err := json.Unmarshal(data, &serviceAccount); err != nil {
+		return nil, fmt.Errorf("failed to parse service account JSON: %w", err)
+	}
+
+	return &Credentials{
+		Type:        serviceAccount.Type,
+		ClientEmail: serviceAccount.ClientEmail,
+		PrivateKey:  serviceAccount.PrivateKey,
+		TokenURL:    "https://oauth2.googleapis.com/token",
+		ProjectID:   serviceAccount.ProjectID,
+	}, nil
+}
+
+func New(config *common.CloudServiceConfig) (*Service, error) {
+	if config == nil {
+		return nil, fmt.Errorf("config can't be nil for GCP")
 	}
 
 	if config.Zone == "" {
@@ -34,18 +59,51 @@ func New(config *common.CloudServiceConfig) (*Service, error) {
 		return nil, fmt.Errorf("region is required for GCP")
 	}
 
-	if config.Credentials == nil || config.Credentials.Secret == "" || config.Credentials.Type != "token" {
-		return nil, fmt.Errorf("token credentials are required for GCP")
+	if config.Credentials == nil || config.Credentials.Secret == "" {
+		return nil, fmt.Errorf("credentials are required for GCP")
 	}
 
-	compute, err := NewComputeClient(&config.Endpoint, &config.Credentials.Secret, nil)
+	var creds *Credentials
+	var err error
+	if config.Credentials.Type == "service_account" || config.Credentials.Type == "" {
+		// Load credentials from service account JSON file
+		creds, err = loadServiceAccountCredentials(config.Credentials.Secret)
+		if err != nil {
+			return nil, fmt.Errorf("failed to load service account credentials: %w", err)
+		}
+	} else if config.Credentials.Type == "token" {
+		// Use token directly as the private key, this is used for testing
+		creds = &Credentials{
+			PrivateKey: config.Credentials.Secret,
+		}
+	} else {
+		return nil, fmt.Errorf("unsupported credentials type: %s", config.Credentials.Type)
+	}
+
+	// Use ProjectID from service account if not specified in config
+	projectID := config.ProjectID
+	if projectID == "" {
+		if creds.ProjectID == "" {
+			return nil, fmt.Errorf("project ID is required for GCP")
+		}
+		projectID = creds.ProjectID
+	}
+
+	// Create token manager
+	tokenManager, err := NewTokenManager(creds)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create token manager: %w", err)
+	}
+
+	// Create compute client with token manager
+	compute, err := NewComputeClient(&config.Endpoint, tokenManager)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create compute client: %w", err)
 	}
 
 	return &Service{
 		compute:   *compute,
-		projectID: config.ProjectID,
+		projectID: projectID,
 		zone:      config.Zone,
 		region:    config.Region,
 		config:    config,
