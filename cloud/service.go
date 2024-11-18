@@ -6,6 +6,7 @@ import (
 	"log"
 
 	"github.com/danbiagini/traefik-cloud-saver/cloud/common"
+	"github.com/danbiagini/traefik-cloud-saver/cloud/gcp"
 	"github.com/danbiagini/traefik-cloud-saver/cloud/mock"
 )
 
@@ -17,20 +18,20 @@ type Service interface {
 }
 
 const (
-	aws    = "aws"   // placeholder for future AWS implementation
-	gcp    = "gcp"   // active GCP implementation
-	azure  = "azure" // placeholder for future Azure implementation
-	mock_t = "mock"
+	aws_t   = "aws"   // placeholder for future AWS implementation
+	gcp_t   = "gcp"   // active GCP implementation
+	azure_t = "azure" // placeholder for future Azure implementation
+	mock_t  = "mock"
 )
 
 // NewService creates a new cloud service based on configuration
 func NewService(config *common.CloudServiceConfig) (Service, error) {
 	switch config.Type {
-	case aws:
+	case aws_t:
 		return nil, fmt.Errorf("AWS implementation not yet available")
-	case gcp:
-		return nil, fmt.Errorf("GCP implementation not yet available")
-	case azure:
+	case gcp_t:
+		return gcp.New(config)
+	case azure_t:
 		return nil, fmt.Errorf("AZURE implementation not yet available")
 	case mock_t:
 		return mock.New(config)

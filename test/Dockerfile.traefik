@@ -4,7 +4,7 @@ COPY ../ .
 RUN make lint
 RUN make test
 
-FROM traefik:v2.10
+FROM traefik:v3.2
 WORKDIR /
 RUN mkdir -p plugins-local/src/github.com/danbiagini/traefik-cloud-saver
 COPY ../ plugins-local/src/github.com/danbiagini/traefik-cloud-saver/

@@ -8,7 +8,10 @@ services:
       - "80:80"
       - "8080:8080" # Dashboard
     volumes:
-      - ../test/traefik.yml:/etc/traefik/traefik.yml
+    # choose which traefik.yml to use, i.e TRAEFIK_CONFIG_FILE=./traefik-gcp.yml
+      - type: bind
+        source: ${TRAEFIK_CONFIG_FILE:-../test/traefik.yml}
+        target: /etc/traefik/traefik.yml
       - /var/run/docker.sock:/var/run/docker.sock:ro
     command:
       - --log.level=DEBUG

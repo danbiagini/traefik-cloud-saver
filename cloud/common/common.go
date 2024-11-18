@@ -18,7 +18,7 @@ type CloudServiceConfig struct {
 	Region       string             `json:"region,omitempty"`
 	ResourceTags map[string]string  `json:"resourceTags,omitempty"`
 	Credentials  *CredentialsConfig `json:"credentials,omitempty"`
-
+	Endpoint     string             `json:"endpoint,omitempty"`
 	// GCP specific fields
 	ServiceAccount string `json:"serviceAccount,omitempty"`
 	ProjectID      string `json:"projectID,omitempty"`
@@ -68,4 +68,8 @@ func (c *CloudServiceConfig) GetRegion() string {
 
 func (c *CloudServiceConfig) GetResourceTags() map[string]string {
 	return c.ResourceTags
+}
+
+func (c *CloudServiceConfig) GetEndpoint() string {
+	return c.Endpoint
 }
