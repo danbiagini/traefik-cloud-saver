@@ -48,7 +48,7 @@ type Operation struct {
 
 func NewComputeClient(baseURL *string, tokenManager *TokenManager, options ...ComputeClientOption) (*ComputeClient, error) {
 	base := computeBasePath
-	if baseURL != nil {
+	if baseURL != nil && *baseURL != "" {
 		base = *baseURL
 	}
 

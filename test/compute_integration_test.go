@@ -13,8 +13,10 @@ package test
 import (
 	"context"
 	"os"
+	"path/filepath"
 	"testing"
 
+	"github.com/danbiagini/traefik-cloud-saver/cloud/common"
 	"github.com/danbiagini/traefik-cloud-saver/cloud/gcp"
 )
 
@@ -27,58 +29,51 @@ func skipIfNoIntegrationTest(t *testing.T) {
 func TestIntegrationComputeClient(t *testing.T) {
 	skipIfNoIntegrationTest(t)
 
-	// Read credentials from environment variables
-	projectID := os.Getenv("GCP_PROJECT_ID")
+	// Read configuration from environment variables
+	credentialsPath := os.Getenv("GCP_CREDENTIALS_PATH")
+	credentialsType := os.Getenv("GCP_CREDENTIALS_TYPE")
+	if credentialsPath == "" {
+		credentialsPath = filepath.Join(os.Getenv("HOME"), ".config", "gcloud", "application_default_credentials.json")
+		credentialsType = "application_default"
+	}
+
 	zone := os.Getenv("GCP_ZONE")
+	region := os.Getenv("GCP_REGION")
+	projectID := os.Getenv("GCP_PROJECT_ID")
 	instanceName := os.Getenv("GCP_INSTANCE_NAME")
-	authToken := os.Getenv("GCP_AUTH_TOKEN")
 
-	if projectID == "" || zone == "" || instanceName == "" {
-		t.Fatal("GCP_PROJECT_ID, GCP_ZONE, and GCP_INSTANCE_NAME environment variables must be set")
+	if zone == "" || instanceName == "" {
+		t.Fatal("GCP_ZONE and GCP_INSTANCE_NAME environment variables must be set")
 	}
 
-	if authToken == "" {
-		t.Fatal("GCP_AUTH_TOKEN environment variable must be set")
+	config := &common.CloudServiceConfig{
+		Zone:      zone,
+		Region:    region,
+		ProjectID: projectID,
+		Credentials: &common.CredentialsConfig{
+			Secret: credentialsPath,
+			Type:   credentialsType,
+		},
 	}
-
-	baseURL := "https://compute.googleapis.com/compute/v1"
-	client, err := gcp.NewComputeClient(&baseURL, &authToken, nil)
+	s, err := gcp.New(config)
 	if err != nil {
-		t.Fatalf("Failed to create compute client: %v", err)
+		t.Fatalf("Failed to create GCP service: %v", err)
 	}
 
 	ctx := context.Background()
-
-	t.Run("get_instance", func(t *testing.T) {
-		instance, err := client.GetInstance(ctx, projectID, zone, instanceName)
+	t.Run("get_instance_scale", func(t *testing.T) {
+		count, err := s.GetCurrentScale(ctx, instanceName)
 		if err != nil {
 			t.Fatalf("Failed to get instance: %v", err)
 		}
-		if instance.Name != instanceName {
-			t.Errorf("Got instance name %s, want %s", instance.Name, instanceName)
-		}
+		t.Logf("Instance scale: %d", count)
 	})
 
 	t.Run("stop_and_start_instance", func(t *testing.T) {
-		// First verify instance is running
-		instance, err := client.GetInstance(ctx, projectID, zone, instanceName)
-		if err != nil {
-			t.Fatalf("Failed to get instance: %v", err)
-		}
-		if instance.Status != "RUNNING" {
-			t.Skipf("Instance not in RUNNING state (current: %s), skipping stop/start test", instance.Status)
-		}
-
 		// Stop the instance
-		operation, err := client.StopInstance(ctx, projectID, zone, instanceName)
+		err := s.ScaleDown(ctx, instanceName)
 		if err != nil {
 			t.Fatalf("Failed to stop instance: %v", err)
-		}
-
-		if operation.Status != "TERMINATED" && operation.Status != "STOPPED" {
-			t.Errorf("Got operation status %s, want %s", operation.Status, "TERMINATED or STOPPED")
-		} else {
-			t.Logf("Instance status: %s", operation.Status)
 		}
 	})
 }
