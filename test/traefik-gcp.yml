@@ -26,6 +26,8 @@ providers:
           secret: "/etc/gcp/test_service_account.json"
           type: service_account
 
+  file:
+    directory: /etc/traefik/rules
 
   docker:
     endpoint: "unix:///var/run/docker.sock"

@@ -4,7 +4,9 @@
 // export INTEGRATION_TEST=true
 // export GCP_PROJECT_ID=your-project-id
 // export GCP_ZONE=your-zone
+// export GCP_REGION=your-region
 // export GCP_INSTANCE_NAME=your-instance-name
+// export GCP_CREDENTIALS_PATH=path/to/your/credentials.json
 // go test -v ./test/compute_integration_test.go
 // *****************************************************
 

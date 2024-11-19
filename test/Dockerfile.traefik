@@ -8,7 +8,9 @@ FROM traefik:v3.2
 WORKDIR /
 RUN mkdir -p plugins-local/src/github.com/danbiagini/traefik-cloud-saver
 COPY ../ plugins-local/src/github.com/danbiagini/traefik-cloud-saver/
-COPY test/traefik.yml /etc/traefik/traefik.yml
+# COPY test/traefik.yml /etc/traefik/traefik.yml
+RUN mkdir -p /etc/traefik/rules
+COPY test/static-rules/* /etc/traefik/rules/
 
 COPY test/entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
