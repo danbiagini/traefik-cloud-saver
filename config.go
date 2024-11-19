@@ -1,17 +1,18 @@
 package traefik_cloud_saver
 
 import (
-	"time"
-	"github.com/your-repo/traefik-cloud-saver/cloud"
+	"github.com/danbiagini/traefik-cloud-saver/cloud/common"
 )
 
 // Config the plugin configuration.
 type Config struct {
-	TrafficThreshold float64            `json:"trafficThreshold,omitempty"`
-	WindowSize       string             `json:"windowSize,omitempty"`
-	MetricsURL       string             `json:"metricsURL,omitempty"`
-	RouterFilter     *RouterFilter      `json:"routerFilter,omitempty"`
-	CloudConfig      *cloud.ProviderConfig `json:"cloudProvider,omitempty"`
+	TrafficThreshold float64                    `json:"trafficThreshold,omitempty"`
+	WindowSize       string                     `json:"windowSize,omitempty"`
+	MetricsURL       string                     `json:"metricsURL,omitempty"`
+	RouterFilter     *RouterFilter              `json:"routerFilter,omitempty"`
+	CloudConfig      *common.CloudServiceConfig `json:"cloudConfig,omitempty"`
+	APIURL           string                     `json:"apiURL,omitempty"`
+	Debug            bool                       `json:"debug,omitempty"`
 	testMode         bool
 }
 
@@ -19,12 +20,14 @@ type Config struct {
 func CreateConfig() *Config {
 	return &Config{
 		TrafficThreshold: 1,
-		WindowSize:      "5m",
-		MetricsURL:     "http://localhost:8080/metrics",
-		RouterFilter:    nil,
-		CloudConfig:     &cloud.ProviderConfig{
-			ResourceTags: make(map[string]string),
+		WindowSize:       "5m",
+		MetricsURL:       "http://localhost:8080/metrics",
+		RouterFilter:     nil,
+		CloudConfig: &common.CloudServiceConfig{
+			Type: "mock",
 		},
-		testMode:        false,
+		testMode: false,
+		APIURL:   "http://localhost:8080/api/",
+		Debug:    false,
 	}
-} 
+}

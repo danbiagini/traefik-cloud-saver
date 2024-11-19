@@ -1,0 +1,13 @@
+http:
+  routers:
+    traefik-cloud-saver-test-router:
+      entryPoints:
+        - "web"
+      rule: "Host(`traefik-test`)"
+      service: traefik-cloud-saver-test
+  services:
+    traefik-cloud-saver-test:
+      loadBalancer:
+        passHostHeader: false
+        servers:
+          - url: "http://traefik-test.cloudlightsoff.com/"

@@ -1,9 +1,11 @@
+
 # Go specific
 *.exe
 *.exe~
 *.dll
 *.so
 *.dylib
+
 *.test
 *.out
 go.work
@@ -21,6 +23,7 @@ build/
 .vscode/
 *.swp
 *.swo
+
 .DS_Store
 
 # Debug files

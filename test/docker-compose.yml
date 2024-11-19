@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   traefik:
     build:
@@ -10,18 +8,20 @@ services:
       - "80:80"
       - "8080:8080" # Dashboard
     volumes:
-      - ../test/traefik.yml:/etc/traefik/traefik.yml
+    # choose which traefik.yml to use, i.e TRAEFIK_CONFIG_FILE=./traefik-gcp.yml
+      - type: bind
+        source: ${TRAEFIK_CONFIG_FILE:-../test/traefik.yml}
+        target: /etc/traefik/traefik.yml
       - /var/run/docker.sock:/var/run/docker.sock:ro
-    environment:
-      - TRAEFIK_EXPERIMENTAL_PLUGINS_MYPLUGIN_MODULENAME=github.com/your-username/your-plugin
-      - TRAEFIK_EXPERIMENTAL_PLUGINS_MYPLUGIN_VERSION=v0.1.0
+    # GCP_CREDS is the path to the GCP credentials file for testing
+      - type: bind
+        source: ${GCP_CREDS}
+        target: /etc/gcp/test_service_account.json
     command:
       - --log.level=DEBUG
       - --api.insecure=true
       - --providers.docker=true
       - --providers.docker.exposedbydefault=false
-      - --experimental.plugins.myplugin.modulename=github.com/your-username/your-plugin
-      - --experimental.plugins.myplugin.version=v0.1.0
   whoami:
     image: traefik/whoami
     ports:
@@ -29,4 +29,10 @@ services:
     labels:
       - traefik.enable=true
       - traefik.http.routers.whoami.rule=Host(`whoami.localhost`)
-      - traefik.http.services.whoami.loadbalancer.server.port=80
+  whoami-2:
+    image: traefik/whoami
+    ports:
+      - "8082:80"
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.whoami-2.rule=Host(`whoami-2.localhost`)

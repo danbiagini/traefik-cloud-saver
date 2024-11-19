@@ -3,11 +3,12 @@ package traefik_cloud_saver
 import (
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"strings"
 	"time"
 	"bufio"
+
+	"github.com/danbiagini/traefik-cloud-saver/cloud/common"
 )
 
 // MetricsCollector handles all metrics-related operations
@@ -46,7 +47,7 @@ func (mc *MetricsCollector) GetServiceRates() (map[string]*ServiceRate, error) {
 	duration := now.Sub(mc.lastTime)
 	rates := make(map[string]*ServiceRate)
 
-	log.Printf("Current counts: %v, Last counts: %v, Duration: %v", currentCounts, mc.lastCounts, duration)
+	common.DebugLog("traefik-cloud-saver", "Current counts: %v, Last counts: %v, Duration: %v", currentCounts, mc.lastCounts, duration)
 
 	for service, count := range currentCounts {
 		var ratePerMin float64
@@ -84,7 +85,7 @@ func (mc *MetricsCollector) fetchServiceRequests() (map[string]float64, error) {
 	defer func() {
 		closeErr := resp.Body.Close()
 		if closeErr != nil {
-			log.Printf("failed to close response body: %v", closeErr)
+			common.LogProvider("traefik-cloud-saver", "[Error] closing response body: %v", closeErr)
 		}
 	}()
 
@@ -95,7 +96,7 @@ func (mc *MetricsCollector) fetchServiceRequests() (map[string]float64, error) {
 
 	// if the body is empty, lets log a warning and return an empty map
 	if len(body) == 0 {
-		log.Println("response body is empty")
+		common.LogProvider("traefik-cloud-saver", "[WARNING] Metrics response body is empty")
 		return make(map[string]float64), nil
 	}
 

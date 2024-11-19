@@ -19,13 +19,15 @@ providers:
       trafficThreshold: 1
       debug: true
       cloudConfig:
-        type: mock
-        projectID: "puckwax-schedule-helper"
-        zone: "us-central1-a"
-        resetAfter: 2m
-        initialScale:
-          whoami-test@docker: 1
-          whoami-2-test@docker: 3
+        type: gcp
+        region: "us-central1"
+        zone: "us-central1-c"
+        credentials:
+          secret: "/etc/gcp/test_service_account.json"
+          type: service_account
+
+  file:
+    directory: /etc/traefik/rules
 
   docker:
     endpoint: "unix:///var/run/docker.sock"
