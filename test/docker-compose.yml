@@ -13,6 +13,7 @@ services:
         source: ${TRAEFIK_CONFIG_FILE:-../test/traefik.yml}
         target: /etc/traefik/traefik.yml
       - /var/run/docker.sock:/var/run/docker.sock:ro
+    # GCP_CREDS is the path to the GCP credentials file for testing
       - type: bind
         source: ${GCP_CREDS}
         target: /etc/gcp/test_service_account.json
