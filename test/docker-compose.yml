@@ -13,6 +13,9 @@ services:
         source: ${TRAEFIK_CONFIG_FILE:-../test/traefik.yml}
         target: /etc/traefik/traefik.yml
       - /var/run/docker.sock:/var/run/docker.sock:ro
+      - type: bind
+        source: ${GCP_CREDS}
+        target: /etc/gcp/test_service_account.json
     command:
       - --log.level=DEBUG
       - --api.insecure=true

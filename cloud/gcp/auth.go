@@ -61,7 +61,11 @@ func (tm *TokenManager) GetToken(ctx context.Context) (string, error) {
 	}
 
 	// Need to refresh
-	return tm.fetchToken(ctx)
+	token, err := tm.fetchToken(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to fetch token: %w", err)
+	}
+	return token, nil
 }
 
 func (tm *TokenManager) fetchToken(ctx context.Context) (string, error) {

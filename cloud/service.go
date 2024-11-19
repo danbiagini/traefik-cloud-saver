@@ -30,11 +30,19 @@ func NewService(config *common.CloudServiceConfig) (Service, error) {
 	case aws_t:
 		return nil, fmt.Errorf("AWS implementation not yet available")
 	case gcp_t:
-		return gcp.New(config)
+		svc, err := gcp.New(config)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create GCP cloud service: %w", err)
+		}
+		return svc, nil
 	case azure_t:
 		return nil, fmt.Errorf("AZURE implementation not yet available")
 	case mock_t:
-		return mock.New(config)
+		svc, err := mock.New(config)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create mock cloud service: %w", err)
+		}
+		return svc, nil
 	default:
 		return nil, fmt.Errorf("unknown cloud provider: %s", config.Type)
 	}

@@ -28,8 +28,21 @@ func NewJWTSigner(privateKeyPEM string) (*JWTSigner, error) {
 
 // SignClaims creates and signs a JWT with the provided claims
 func (s *JWTSigner) SignClaims(claims map[string]interface{}) (string, error) {
-	token := jwt.New(s.method)
-	token.Claims = jwt.MapClaims(claims)
+
+	if s == nil || s.privateKey == nil {
+		return "", fmt.Errorf("JWT signer is not initialized")
+	}
+
+	if s.method == nil {
+		return "", fmt.Errorf("JWT signing method is not initialized")
+	}
+
+	LogProvider("traefik-cloud-saver", "SignClaims: %v", claims)
+	token := jwt.NewWithClaims(s.method, jwt.MapClaims(claims))
+
+	if token == nil {
+		return "", fmt.Errorf("failed to create JWT token")
+	}
 
 	tokenString, err := token.SignedString(s.privateKey)
 	if err != nil {

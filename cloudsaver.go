@@ -59,6 +59,8 @@ func New(_ context.Context, config *Config, name string) (*CloudSaver, error) {
 		return nil, fmt.Errorf("failed to create cloud service: %w", err)
 	}
 
+	common.LogProvider("traefik-cloud-saver", "Cloud service created successfully")
+
 	return &CloudSaver{
 		name:             name,
 		windowSize:       windowSize,
@@ -194,6 +196,11 @@ func (p *CloudSaver) getRouterForService(serviceName string) (string, error) {
 }
 
 func (p *CloudSaver) generateConfiguration() (*dynamic.JSONPayload, error) {
+	if p.cloudService == nil {
+		common.LogProvider("traefik-cloud-saver", "ERROR: cloud service is nil")
+		return nil, fmt.Errorf("cloud service is nil")
+	}
+
 	// Get current service rates
 	rates, err := p.metricsCollector.GetServiceRates()
 	if err != nil {
@@ -218,13 +225,17 @@ func (p *CloudSaver) generateConfiguration() (*dynamic.JSONPayload, error) {
 		if rate.PerMin < p.trafficThreshold {
 			common.LogProvider("traefik-cloud-saver", "LOW TRAFFIC ALERT: Service %s (router %s) is below threshold (%.2f < %.2f req/min)",
 				serviceName, routerName, rate.PerMin, p.trafficThreshold)
-			go func(serviceName string) {
-				ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-				defer cancel()
-				if err := p.cloudService.ScaleDown(ctx, serviceName); err != nil {
-					common.LogProvider("traefik-cloud-saver", "ERROR: failed to scale down service %s, err: %s", serviceName, err)
-				}
-			}(serviceName)
+
+			if p.cloudService == nil {
+				common.LogProvider("traefik-cloud-saver", "ERROR: cloud service is nil")
+				continue
+			}
+
+			if err := p.cloudService.ScaleDown(context.Background(), serviceName); err != nil {
+				common.LogProvider("traefik-cloud-saver", "ERROR: failed to scale down service %s, err: %s", serviceName, err)
+			} else {
+				common.LogProvider("traefik-cloud-saver", "Successfully scaled down service %s", serviceName)
+			}
 		}
 	}
 

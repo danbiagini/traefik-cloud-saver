@@ -72,7 +72,7 @@ func New(config *common.CloudServiceConfig) (*Service, error) {
 			return nil, fmt.Errorf("failed to load service account credentials: %w", err)
 		}
 	} else if config.Credentials.Type == "token" {
-		// Use token directly as the private key, this is used for testing
+		// Use token directly as the private key, this is used for testing, it won't work in production
 		creds = &Credentials{
 			PrivateKey: config.Credentials.Secret,
 		}
@@ -101,6 +101,10 @@ func New(config *common.CloudServiceConfig) (*Service, error) {
 		return nil, fmt.Errorf("failed to create compute client: %w", err)
 	}
 
+	if compute == nil {
+		return nil, fmt.Errorf("compute client is nil")
+	}
+
 	return &Service{
 		compute:   *compute,
 		projectID: projectID,
@@ -113,9 +117,17 @@ func New(config *common.CloudServiceConfig) (*Service, error) {
 func (s *Service) ScaleDown(ctx context.Context, instanceName string) error {
 	// First check instance status
 
+	common.LogProvider("traefik-cloud-saver", "ScaleDown for instance %s", instanceName)
+	if s == nil {
+		return fmt.Errorf("service is nil")
+	}
+
 	instance, err := s.compute.GetInstance(ctx, s.projectID, s.zone, instanceName)
 	if err != nil {
 		return fmt.Errorf("failed to get instance %s: %w", instanceName, err)
+	}
+	if instance == nil {
+		return fmt.Errorf("received nil instance from GetInstance for %s", instanceName)
 	}
 
 	// If instance is already stopped or stopping, return early

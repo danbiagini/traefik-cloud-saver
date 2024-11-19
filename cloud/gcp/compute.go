@@ -9,6 +9,8 @@ import (
 	"net/http"
 	"path"
 	"time"
+
+	"github.com/danbiagini/traefik-cloud-saver/cloud/common"
 )
 
 const computeBasePath = "https://compute.googleapis.com/compute/v1"
@@ -96,6 +98,7 @@ func (c *ComputeClient) doRequest(ctx context.Context, method, urlPath string, b
 	req.Header.Set("Authorization", "Bearer "+token)
 	req.Header.Set("Content-Type", "application/json")
 
+	common.LogProvider("traefik-cloud-saver", "Request: %s %s", req.Method, req.URL.Path)
 	resp, err := c.client.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute request: %w", err)
@@ -129,16 +132,19 @@ func (c *ComputeClient) doRequest(ctx context.Context, method, urlPath string, b
 	return respBody, nil
 }
 
-func (c *ComputeClient) GetInstance(ctx context.Context, projectID, zone, instance string) (*Instance, error) {
-	urlPath := path.Join("projects", projectID, "zones", zone, "instances", instance)
+func (c *ComputeClient) GetInstance(ctx context.Context, projectID, zone, instanceName string) (*Instance, error) {
+	common.LogProvider("traefik-cloud-saver", "GetInstance: projects/%s/zones/%s/instances/%s",
+		projectID, zone, instanceName)
 
-	respBody, err := c.doRequest(ctx, http.MethodGet, urlPath, nil)
+	urlPath := path.Join("projects", projectID, "zones", zone, "instances", instanceName)
+
+	resp, err := c.doRequest(ctx, http.MethodGet, urlPath, nil)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to get instance: %w", err)
 	}
 
 	var result Instance
-	if err := json.Unmarshal(respBody, &result); err != nil {
+	if err := json.Unmarshal(resp, &result); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal instance response: %w", err)
 	}
 
