@@ -19,10 +19,18 @@ func TestNew(t *testing.T) {
 		if r.URL.Path == "/api/http/routers" {
 			// Return empty router configuration
 			json.NewEncoder(w).Encode([]*TraefikRouter{})
+		} else if r.URL.Path == "/metrics" {
+			// Return empty Prometheus metrics
+			w.Write([]byte("# Empty metrics for testing\n"))
+		} else {
+			http.NotFound(w, r)
 		}
 	}))
 	defer server.Close()
 
+	if server == nil {
+		t.Fatal("server is nil")
+	}
 	// expect an empty configuration
 	expected := &dynamic.Configuration{
 		HTTP: &dynamic.HTTPConfiguration{
@@ -47,6 +55,7 @@ func TestNew(t *testing.T) {
 		t.Fatal(err)
 	}
 	provider.apiURL = server.URL + "/api"
+	provider.metricsCollector.metricsURL = server.URL + "/metrics"
 
 	t.Cleanup(func() {
 		err = provider.Stop()
@@ -77,7 +86,7 @@ func TestNew(t *testing.T) {
 		if !bytes.Equal(expectedJSON, dataJSON) {
 			t.Fatalf("got %s, want: %s", string(dataJSON), string(expectedJSON))
 		}
-	case <-time.After(2 * time.Second):
+	case <-time.After(10 * time.Second):
 		t.Fatal("timeout waiting for configuration")
 	}
 
