@@ -1,0 +1,36 @@
+api:
+  dashboard: true
+  insecure: true
+
+metrics:
+  prometheus: {}
+
+experimental:
+  localPlugins:
+    traefik_cloud_saver:
+      moduleName: github.com/danbiagini/traefik-cloud-saver
+
+providers:
+  plugin:
+    traefik_cloud_saver:
+      windowSize: 1m
+      metricsURL: http://localhost:8080/metrics
+      apiURL: http://localhost:8080/api
+      trafficThreshold: 1
+      debug: true
+      cloudConfig:
+        type: gcp
+        region: "us-central1"
+        zone: "us-central1-a"
+        credentials:
+          secret: "/etc/gcp/test_service_account.json"
+          type: service_account
+
+
+  docker:
+    endpoint: "unix:///var/run/docker.sock"
+    exposedByDefault: false
+
+entryPoints:
+  web:
+    address: ":80" 
