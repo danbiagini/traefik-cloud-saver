@@ -14,14 +14,13 @@ yaegi_test:
 	yaegi test .
 
 vendor:
-	go get google.golang.org/api@latest
 	go mod tidy
 	go mod vendor
 
 clean:
 	rm -rf ./vendor
 
-build-test-container:
+build-test-container: test
 	cd test && docker compose build traefik
 
 # run test container, depend on build-test-container

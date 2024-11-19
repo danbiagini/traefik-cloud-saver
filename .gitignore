@@ -10,9 +10,6 @@
 *.out
 go.work
 
-# Vendor directory (though some projects commit this)
-vendor/
-
 # Build output
 bin/
 dist/
