@@ -98,7 +98,7 @@ func (c *ComputeClient) doRequest(ctx context.Context, method, urlPath string, b
 	req.Header.Set("Authorization", "Bearer "+token)
 	req.Header.Set("Content-Type", "application/json")
 
-	common.LogProvider("traefik-cloud-saver", "Request: %s %s", req.Method, req.URL.Path)
+	common.DebugLog("traefik-cloud-saver", "Request: %s %s", req.Method, req.URL.Path)
 	resp, err := c.client.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute request: %w", err)
@@ -133,9 +133,6 @@ func (c *ComputeClient) doRequest(ctx context.Context, method, urlPath string, b
 }
 
 func (c *ComputeClient) GetInstance(ctx context.Context, projectID, zone, instanceName string) (*Instance, error) {
-	common.LogProvider("traefik-cloud-saver", "GetInstance: projects/%s/zones/%s/instances/%s",
-		projectID, zone, instanceName)
-
 	urlPath := path.Join("projects", projectID, "zones", zone, "instances", instanceName)
 
 	resp, err := c.doRequest(ctx, http.MethodGet, urlPath, nil)

@@ -187,6 +187,64 @@ func TestRealWorldResponse(t *testing.T) {
 	})
 }
 
+func TestCloudServiceName(t *testing.T) {
+	// Create CloudSaver instance
+	config := CreateConfig()
+	config.testMode = true
+
+	provider, err := New(context.Background(), config, "test")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	tests := []struct {
+		name           string
+		serviceName    string
+		expectedResult string
+	}{
+		{
+			name: "docker provider",
+			serviceName: "whoami@docker",
+			expectedResult: "whoami",
+		},
+		{
+			name: "no @ in service name",
+			serviceName: "whoami",
+			expectedResult: "whoami",
+		},
+		{
+			name: "just an @",
+			serviceName: "@",
+			expectedResult: "",
+		},
+		{
+			name: "empty service name",
+			serviceName: "",
+			expectedResult: "",
+		},
+		{
+			name: "starts with @",
+			serviceName: "@whoami",
+			expectedResult: "",
+		},
+		{
+			name: "ends with @",
+			serviceName: "whoami@",
+			expectedResult: "whoami",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := provider.getCloudServiceName(tt.serviceName)
+			if result != tt.expectedResult {
+				t.Errorf("getCloudServiceName(%s) = %s, want %s", tt.serviceName, result, tt.expectedResult)
+			}
+		})
+	}
+
+}
+
 func TestGetRoutersFromAPI(t *testing.T) {
 
 	tests := []struct {

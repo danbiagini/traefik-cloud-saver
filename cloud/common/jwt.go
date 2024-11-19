@@ -37,7 +37,7 @@ func (s *JWTSigner) SignClaims(claims map[string]interface{}) (string, error) {
 		return "", fmt.Errorf("JWT signing method is not initialized")
 	}
 
-	LogProvider("traefik-cloud-saver", "SignClaims: %v", claims)
+	DebugLog("traefik-cloud-saver", "SignClaims: %v", claims)
 	token := jwt.NewWithClaims(s.method, jwt.MapClaims(claims))
 
 	if token == nil {

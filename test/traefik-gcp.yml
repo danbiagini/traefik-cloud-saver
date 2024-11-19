@@ -21,7 +21,7 @@ providers:
       cloudConfig:
         type: gcp
         region: "us-central1"
-        zone: "us-central1-a"
+        zone: "us-central1-c"
         credentials:
           secret: "/etc/gcp/test_service_account.json"
           type: service_account

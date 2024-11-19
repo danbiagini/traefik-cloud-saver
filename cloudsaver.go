@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/danbiagini/traefik-cloud-saver/cloud"
@@ -61,6 +62,8 @@ func New(_ context.Context, config *Config, name string) (*CloudSaver, error) {
 
 	common.LogProvider("traefik-cloud-saver", "Cloud service created successfully")
 
+	common.SetDebug(config.Debug)
+	
 	return &CloudSaver{
 		name:             name,
 		windowSize:       windowSize,
@@ -101,7 +104,7 @@ func (p *CloudSaver) Provide(cfgChan chan<- json.Marshaler) error {
 	go func() {
 		defer func() {
 			if err := recover(); err != nil {
-				common.LogProvider("traefik-cloud-saver", "ERROR: panic in provider: %v", err)
+				common.LogProvider("traefik-cloud-saver", "[ERROR]: panic in provider: %v", err)
 			}
 		}()
 
@@ -120,7 +123,7 @@ func (p *CloudSaver) loadConfiguration(ctx context.Context, cfgChan chan<- json.
 		case <-ticker.C:
 			configuration, err := p.generateConfiguration()
 			if err != nil {
-				common.LogProvider("traefik-cloud-saver", "ERROR: Failed to generate configuration: %v", err)
+				common.LogProvider("traefik-cloud-saver", "[ERROR]: Failed to generate configuration: %v", err)
 				continue
 			}
 
@@ -138,7 +141,7 @@ func (p *CloudSaver) Stop() error {
 	return nil
 }
 
-// Update TraefikRouter struct to match all fields from the API response
+// TraefikRouter struct -  all fields from the API response
 type TraefikRouter struct {
 	Name        string   `json:"name"`
 	Rule        string   `json:"rule"`
@@ -186,7 +189,7 @@ func (p *CloudSaver) getRouterForService(serviceName string) (string, error) {
 	}
 
 	// the usedBy field is an array of strings, let's use the first one.
-	// TODO: handle multiple routers for the same service
+	// TODO: handle multiple routers for the same service, not sure if that's possible...
 	usedBy, ok := serviceInfo["usedBy"].([]interface{})
 	if !ok || len(usedBy) == 0 {
 		return "", fmt.Errorf("service %s does not have usedBy field", serviceName)
@@ -195,11 +198,16 @@ func (p *CloudSaver) getRouterForService(serviceName string) (string, error) {
 	return routerName, nil
 }
 
-func (p *CloudSaver) generateConfiguration() (*dynamic.JSONPayload, error) {
-	if p.cloudService == nil {
-		common.LogProvider("traefik-cloud-saver", "ERROR: cloud service is nil")
-		return nil, fmt.Errorf("cloud service is nil")
+func (p *CloudSaver) getCloudServiceName(traefikServiceName string) string {
+	// lets check if there is an @ in the serviceName, and if so we will strip it off (including the remaining characters after the @)
+	at_i := strings.Index(traefikServiceName, "@")
+	if at_i != -1 {
+		return traefikServiceName[:at_i]
 	}
+	return traefikServiceName
+}
+
+func (p *CloudSaver) generateConfiguration() (*dynamic.JSONPayload, error) {
 
 	// Get current service rates
 	rates, err := p.metricsCollector.GetServiceRates()
@@ -212,7 +220,7 @@ func (p *CloudSaver) generateConfiguration() (*dynamic.JSONPayload, error) {
 	for serviceName, rate := range rates {
 		routerName, err := p.getRouterForService(serviceName)
 		if err != nil {
-			common.LogProvider("traefik-cloud-saver", "ERROR: failed to get router for service %s, err: %s", serviceName, err)
+			common.LogProvider("traefik-cloud-saver", "[ERROR]: failed to get router for service %s, err: %s", serviceName, err)
 			continue
 		}
 
@@ -222,19 +230,17 @@ func (p *CloudSaver) generateConfiguration() (*dynamic.JSONPayload, error) {
 			continue
 		}
 
+		cloudServiceName := p.getCloudServiceName(serviceName)
+
 		if rate.PerMin < p.trafficThreshold {
-			common.LogProvider("traefik-cloud-saver", "LOW TRAFFIC ALERT: Service %s (router %s) is below threshold (%.2f < %.2f req/min)",
+			common.DebugLog("traefik-cloud-saver", "LOW TRAFFIC ALERT: Service %s (router %s) is below threshold (%.2f < %.2f req/min)",
 				serviceName, routerName, rate.PerMin, p.trafficThreshold)
 
-			if p.cloudService == nil {
-				common.LogProvider("traefik-cloud-saver", "ERROR: cloud service is nil")
-				continue
-			}
-
-			if err := p.cloudService.ScaleDown(context.Background(), serviceName); err != nil {
-				common.LogProvider("traefik-cloud-saver", "ERROR: failed to scale down service %s, err: %s", serviceName, err)
+			if err := p.cloudService.ScaleDown(context.Background(), cloudServiceName); err != nil {
+				common.LogProvider("traefik-cloud-saver", "ERROR: failed to scale down service %s, err: %s", cloudServiceName, err)
 			} else {
-				common.LogProvider("traefik-cloud-saver", "Successfully scaled down service %s", serviceName)
+				common.LogProvider("traefik-cloud-saver", "Scaled down service %s (%s) due to rate %.2f below %.2f",
+					serviceName, cloudServiceName, rate.PerMin, p.trafficThreshold)
 			}
 		}
 	}
@@ -249,12 +255,6 @@ func (p *CloudSaver) generateConfiguration() (*dynamic.JSONPayload, error) {
 		},
 	}, nil
 }
-
-// Get the router for a given service
-// func (p *CloudSaver) getRouterForService(_ string) *dynamic.Router {
-// 	// TODO: Implement router lookup logic here.  Need to design a filtering mechanism.
-// 	return nil
-// }
 
 // shouldMonitorRouter checks if a router should be monitored based on filter criteria
 func (p *CloudSaver) shouldMonitorRouter(routerName string) bool {

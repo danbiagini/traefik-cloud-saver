@@ -117,21 +117,16 @@ func New(config *common.CloudServiceConfig) (*Service, error) {
 func (s *Service) ScaleDown(ctx context.Context, instanceName string) error {
 	// First check instance status
 
-	common.LogProvider("traefik-cloud-saver", "ScaleDown for instance %s", instanceName)
-	if s == nil {
-		return fmt.Errorf("service is nil")
-	}
+	common.DebugLog("traefik-cloud-saver", "ScaleDown for instance %s", instanceName)
 
 	instance, err := s.compute.GetInstance(ctx, s.projectID, s.zone, instanceName)
 	if err != nil {
 		return fmt.Errorf("failed to get instance %s: %w", instanceName, err)
 	}
-	if instance == nil {
-		return fmt.Errorf("received nil instance from GetInstance for %s", instanceName)
-	}
 
 	// If instance is already stopped or stopping, return early
 	if instance.Status == "TERMINATED" || instance.Status == "STOPPING" {
+		common.DebugLog("traefik-cloud-saver", "Instance %s is already stopped or stopping", instanceName)
 		return nil
 	}
 

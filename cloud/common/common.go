@@ -5,14 +5,17 @@ import (
 	"log"
 )
 
+var (
+	debugEnabled bool
+)
+
 // CredentialsConfig contains authentication details
 type CredentialsConfig struct {
 	Type   string `json:"type,omitempty"`
 	Secret string `json:"secret,omitempty"` // Generic secret field
 }
 
-// CloudServiceConfig - tried to use an interface but ran into issues
-// with the traefik plugin config handling.
+// CloudServiceConfig 
 type CloudServiceConfig struct {
 	Type         string             `json:"type"`
 	Region       string             `json:"region,omitempty"`
@@ -30,10 +33,21 @@ type CloudServiceConfig struct {
 	ResetAfter   string           `json:"resetAfter,omitempty"`
 }
 
+func SetDebug(enabled bool) {
+	debugEnabled = enabled
+}
+
 // LogProvider is a simple helper for consistent cloud provider logging
 func LogProvider(provider, format string, v ...interface{}) {
 	msg := fmt.Sprintf(format, v...)
 	log.Printf("[%s] %s", provider, msg)
+}
+
+func DebugLog(provider, format string, v ...interface{}) {
+	if debugEnabled {
+		msg := fmt.Sprintf("[DEBUG] %s", format)
+		LogProvider(provider, msg, v...)
+	}
 }
 
 func (c *CloudServiceConfig) Validate() error {
