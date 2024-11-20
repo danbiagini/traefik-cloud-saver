@@ -40,12 +40,7 @@
 
 ## 🔧 Quick Start
 
-The plugin is not available in the [Traefik Plugin Catalog](https://plugins.traefik.io/) *yet*, so you need to build it yourself.  But it's easy to do.
-
 1. **Install the plugin**
-See the sample container build in the 'build-test-container' target in the [Makefile](Makefile).
-
-2. **Configure the plugin**
 ```yaml
 # Static configuration
 
@@ -55,6 +50,8 @@ experimental:
       moduleName: github.com/danbiagini/traefik-cloud-saver
       version: v0.1.0
 ```
+
+2. **Configure the plugin**
 
 ```yaml
 providers:
