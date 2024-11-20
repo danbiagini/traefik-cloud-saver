@@ -1,7 +1,7 @@
 # Traefik Cloud Saver Plugin
 
 <p align="center">
-  <img src=".assets/logo.png" alt="Traefik Cloud Saver" width="200"/>
+  <img src=".assets/cloud-saver-logo.webp" alt="Traefik Cloud Saver" width="200"/>
   <br>
   <em>Automatically scale down idle cloud resources to reduce costs</em>
 </p>
