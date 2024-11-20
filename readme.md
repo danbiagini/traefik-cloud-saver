@@ -29,14 +29,14 @@
 
 ## 📑 Table of Contents
 
-- [Quick Start](#quick-start)
-- [How It Works](#how-it-works)
-- [Troubleshooting](#troubleshooting)
-- [Development](#development)
-- [Testing](#testing)
-- [Contributing](#contributing)
-- [License](#license)
-- [Acknowledgments](#acknowledgments)
+- [Quick Start](#-quick-start)
+- [How It Works](#-how-it-works)
+- [Troubleshooting](#-troubleshooting)
+- [Development](#-development)
+- [Testing](#-testing)
+- [Contributing](#-contributing)
+- [License](#-license)
+- [Acknowledgments](#-acknowledgments)
 
 ## 🔧 Quick Start
 
