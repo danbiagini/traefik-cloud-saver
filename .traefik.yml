@@ -1,6 +1,6 @@
 displayName: Cloud Saver
 type: provider
-iconPath: .assets/icon.png
+iconPath: .assets/cloud-saver-logo-thumbnail.png
 
 import: github.com/danbiagini/traefik-cloud-saver
 
@@ -8,7 +8,7 @@ summary: 'Save cloud resource costs by automatically stopping instances that are
 Think of it like "turning the lights off when the room is empty."'
 
 testData:
-  windowSize: 10m  # 1 minute, how often to check for unused resources
+  windowSize: 1m  # 1 minute, how often to check for unused resources
   metricsURL: http://localhost:8080/metrics  # URL of the metrics endpoint (Prometheus)
   apiURL: http://localhost:8080/api  # URL of the Traefik API
   trafficThreshold: 1  # requests per windowSize before scaling down
