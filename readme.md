@@ -27,6 +27,17 @@
 - 🔜 AWS (coming soon)
 - 🔜 Azure (coming soon)
 
+## 📑 Table of Contents
+
+- [Quick Start](#quick-start)
+- [How It Works](#how-it-works)
+- [Troubleshooting](#troubleshooting)
+- [Development](#development)
+- [Testing](#testing)
+- [Contributing](#contributing)
+- [License](#license)
+- [Acknowledgments](#acknowledgments)
+
 ## 🔧 Quick Start
 
 The plugin is not available in the [Traefik Plugin Catalog](https://plugins.traefik.io/) *yet*, so you need to build it yourself.  But it's easy to do.
@@ -131,7 +142,7 @@ make test
 ```bash
 # Set up GCP credentials first
 make integration-test
-
+```
 
 ## 🤝 Contributing
 
