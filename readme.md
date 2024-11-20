@@ -6,7 +6,7 @@
   <em>Automatically scale down idle cloud resources to reduce costs</em>
 </p>
 
-Think of it as "turning the lights off when the room is empty."
+💸 Think of it as "turning the lights off when the room is empty." 💸
 
 [![Build Status](https://github.com/danbiagini/traefik-cloud-saver/actions/workflows/main.yml/badge.svg?branch=master)](https://github.com/danbiagini/traefik-cloud-saver/actions)
 [![Go Report Card](https://goreportcard.com/badge/github.com/danbiagini/traefik-cloud-saver)](https://goreportcard.com/report/github.com/danbiagini/traefik-cloud-saver)
