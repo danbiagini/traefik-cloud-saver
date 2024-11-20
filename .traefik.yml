@@ -1,10 +1,25 @@
-displayName: Provider Plugin Demo
+displayName: Cloud Saver
 type: provider
 iconPath: .assets/icon.png
 
 import: github.com/danbiagini/traefik-cloud-saver
 
-summary: '[Demo] Simple Provider Plugin'
+summary: 'Save cloud resource costs by automatically stopping instances that are not being used.
+Think of it like "turning the lights off when the room is empty."'
 
 testData:
-  pollInterval: 5s
+  windowSize: 1m  # how often to check for unused resources
+  metricsURL: http://localhost:8080/metrics  # URL of the metrics endpoint (Prometheus)
+  apiURL: http://localhost:8080/api  # URL of the Traefik API
+  trafficThreshold: 1  # requests per windowSize before scaling down
+  debug: true  # enable debug logging
+  cloudConfig:
+    type: mock # mock is for testing, use type: gcp for Google Compute Engine
+    # Uncomment the following for Google Compute Engine.  
+    # You need to provide a GCP service account json file and set the path in the secret field.
+    # zone: "us-central1-a"
+    # region: "us-central1"
+    # credentials:
+      # secret: "/etc/gcp/test_service_account.json"
+      # type: service_account
+

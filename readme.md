@@ -1,266 +1,66 @@
-This repository includes an example plugin, `demo`, for you to use as a reference for developing your own plugins.
+# Traefik Cloud Saver Plugin
 
-[![Build Status](https://github.com/traefik/pluginproviderdemo/workflows/Main/badge.svg?branch=master)](https://github.com/traefik/pluginproviderdemo/actions)
+A Traefik plugin, `traefik-cloud-saver` which saves cloud resource costs by automatically stopping instances that are not being used.
 
-The existing plugins can be browsed into the [Plugin Catalog](https://plugins.traefik.io).
+Think of it like "turning the lights off when the room is empty."
 
-# Provider Plugin Demo
+[![Build Status](https://github.com/danbiagini/traefik-cloud-saver/workflows/Main/badge.svg?branch=master)](https://github.com/danbiagini/traefik-cloud-saver/actions)
 
-[Traefik](https://traefik.io) plugins are developed using the [Go language](https://golang.org).
+## Features
 
-Rather than being pre-compiled and linked, however, plugins are executed on the fly by [Yaegi](https://github.com/traefik/yaegi), an embedded Go interpreter.
+- Monitors traffic rates for Traefik services
+- Automatically scales down cloud instances during low traffic periods
+- Configurable traffic thresholds and monitoring windows
+- Supports filtering specific routers to monitor (TODO)
 
 ## Usage
 
-For a plugin to be active for a given Traefik instance, it must be declared in the static configuration.
+Currently the plugin is not available in the [Traefik Plugin Catalog](https://plugins.traefik.io/), so you need to build it yourself.  But it's easy to do, for a sample container build see the 'build-test-container' target in the [Makefile](Makefile).
 
-Plugins are parsed and loaded exclusively during startup, which allows Traefik to check the integrity of the code and catch errors early on.
-If an error occurs during loading, the plugin is disabled.
-
-For security reasons, it is not possible to start a new plugin or modify an existing one while Traefik is running.
-
-Plugin dependencies must be [vendored](https://golang.org/ref/mod#vendoring) for each plugin.
-Vendored packages should be included in the plugin's GitHub repository. ([Go modules](https://blog.golang.org/using-go-modules) are not supported.)
+I hope to get the plugin added to the Traefik Plugin Catalog soon.
 
 ### Configuration
 
-For each plugin, the Traefik static configuration must define the module name (as is usual for Go packages).
-
-The following declaration (given here in YAML) defines a plugin:
 
 ```yaml
 # Static configuration
 
 experimental:
-  plugins:
-    example:
-      moduleName: github.com/traefik/pluginproviderdemo
+  localPlugins:
+    traefik_cloud_saver:
+      moduleName: github.com/danbiagini/traefik-cloud-saver
       version: v0.1.0
 
 providers:
   plugin:
-    example:
-      pollInterval: 2s
+    traefik_cloud_saver:
+      windowSize: 1m
+      metricsURL: http://localhost:8080/metrics
+      apiURL: http://localhost:8080/api
+      trafficThreshold: 1
+      debug: true
+      cloudConfig:
+        type: gcp
+        region: <your-region>
+        zone: <your-zone>
+        credentials:
+          secret: <path-to-service-account-json-file>
+          type: service_account
 ```
 
+You need to provide a service account json file in the container, for example at `/etc/gcp/test_service_account.json`, or use a different path and change the `secret` path in the above config.
 #### Local Mode
 
-Traefik also offers a developer mode that can be used for temporary testing of plugins not hosted on GitHub.
-To use a plugin in local mode, the Traefik static configuration must define the module name (as is usual for Go packages) and a path to a [Go workspace](https://golang.org/doc/gopath_code.html#Workspaces), which can be the local GOPATH or any directory.
-
-The plugins must be placed in `./plugins-local` directory, 
-which should be in the working directory of the process running the Traefik binary.
-The source code of the plugin should be organized as follows:
-
-```
-./plugins-local/
-    └── src
-        └── github.com
-            └── traefik
-                └── pluginproviderdemo
-                    ├── demo.go
-                    ├── demo_test.go
-                    ├── go.mod
-                    ├── go.sum
-                    ├── LICENSE
-                    ├── Makefile
-                    ├── readme.md
-                    └── vendor
-                        ├── github.com
-                        │   └── traefik
-                        │       └── genconf
-                        │           ├── dynamic
-                        │           │   ├── config.go
-                        │           │   ├── http_config.go
-                        │           │   ├── marshaler.go
-                        │           │   ├── middlewares.go
-                        │           │   ├── plugins.go
-                        │           │   ├── tcp_config.go
-                        │           │   ├── tls
-                        │           │   │   ├── certificate.go
-                        │           │   │   └── tls.go
-                        │           │   ├── types
-                        │           │   │   ├── domains.go
-                        │           │   │   └── tls.go
-                        │           │   └── udp_config.go
-                        │           └── LICENSE
-                        └── modules.txt
-```
-
-```yaml
-# Static configuration
-# Local mode
-entryPoints:
-  web:
-    address: :80
-
-log:
-  level: DEBUG
-
-experimental:
-  localPlugins:
-    example:
-      moduleName: github.com/traefik/pluginproviderdemo
-
-providers:
-  plugin:
-    example:
-      pollInterval: 2s
-```
-
-(In the above example, the `pluginproviderdemo` plugin will be loaded from the path `./plugins-local/src/github.com/traefik/pluginproviderdemo`.)
-
-## Defining a Plugin
-
-A plugin package must define the following exported Go objects:
-
-- A type `type Config struct { ... }`. The struct fields are arbitrary.
-- A function `func CreateConfig() *Config`.
-- A function `New(ctx context.Context, config *Config, name string) (*Provider, error)`.
-
-The provider must follow this interface:
-
-```go
-type PluginProvider interface {
-	Init() error
-	Provide(cfgChan chan<- json.Marshaler) error
-	Stop() error
-}
-```
-
-The Go objects used to build the dynamic configuration are in the following repository: https://github.com/traefik/genconf
-
-Example:
-
-```go
-// Package example a example plugin.
-package example
-
-import (
-	"context"
-	"encoding/json"
-
-	"github.com/traefik/genconf/dynamic"
-	"github.com/traefik/genconf/dynamic/tls"
-)
-
-// Config the plugin configuration.
-type Config struct {
-	// ...
-}
-
-// CreateConfig creates the default plugin configuration.
-func CreateConfig() *Config {
-	return &Config{
-		// ...
-	}
-}
-
-// Provider a plugin.
-type Provider struct {
-	name     string
-    // ...
-}
-
-// New created a new plugin.
-func New(ctx context.Context, config *Config, name string) (*Provider, error) {
-	// ...
-	return &Provider{
-		// ...
-	}, nil
-}
-
-// Init the provider.
-func (p *Provider) Init() error {
-	// ...
-	return nil
-}
-
-// Provide creates and send dynamic configuration.
-func (p *Provider) Provide(cfgChan chan<- json.Marshaler) error {
-	// ...
-	cfgChan <- cfg
-	// ...
-	return nil
-}
-
-// Stop to stop the provider and the related go routines.
-func (p *Provider) Stop() error {
-	// ...
-	return nil
-}
-```
-
+This plugin can be run in local mode, it requires a specific filesystem structure in the container.  See the [Makefile](Makefile) 'build-test-container' target and [Docker Compose](test/docker-compose.yml) for an example.
 ## Logs
 
-Currently, the only way to send logs to Traefik is to use `os.Stdout.WriteString("...")` or `os.Stderr.WriteString("...")`.
-
-In the future, we will try to provide something better and based on levels.
+The plugin logs to traefik logs, search for `traefik-cloud-saver` in the logs.
 
 ## Plugins Catalog
 
 Traefik plugins are stored and hosted as public GitHub repositories.
 
 Every 30 minutes, the Plugins Catalog online service polls Github to find plugins and add them to its catalog.
-
-### Prerequisites
-
-To be recognized by Plugins Catalog, your repository must meet the following criteria:
-
-- The `traefik-plugin` topic must be set.
-- The `.traefik.yml` manifest must exist, and be filled with valid contents.
-
-If your repository fails to meet either of these prerequisites, Plugins Catalog will not see it.
-
-### Manifest
-
-A manifest is also mandatory, and it should be named `.traefik.yml` and stored at the root of your project.
-
-This YAML file provides Plugins Catalog with information about your plugin, such as a description, a full name, and so on.
-
-Here is an example of a typical `.traefik.yml`file:
-
-```yaml
-# The name of your plugin as displayed in the Plugins Catalog web UI.
-displayName: Name of your plugin
-
-type: provider
-
-# The import path of your plugin.
-import: github.com/username/my-plugin
-
-# A brief description of what your plugin is doing.
-summary: Description of what my plugin is doing
-
-# Medias associated to the plugin (optional)
-iconPath: foo/icon.png
-bannerPath: foo/banner.png
-
-# Configuration data for your plugin.
-# This is mandatory,
-# and Plugins Catalog will try to execute the plugin with the data you provide as part of its startup validity tests.
-testData:
-  Headers:
-    Foo: Bar
-```
-
-Properties include:
-
-- `displayName` (required): The name of your plugin as displayed in the Plugins Catalog web UI.
-- `type` (required): the type of the plugin (i.e. `provider`).
-- `import` (required): The import path of your plugin.
-- `summary` (required): A brief description of what your plugin is doing.
-- `testData` (required): Configuration data for your plugin. This is mandatory, and Plugins Catalog will try to execute the plugin with the data you provide as part of its startup validity tests.
-- `iconPath` (optional): A local path in the repository to the icon of the project.
-- `bannerPath` (optional): A local path in the repository to the image that will be used when you will share your plugin page in social medias.
-
-There should also be a `go.mod` file at the root of your project.Plugins Catalog will use this file to validate the name of the project.
-
-### Tags and Dependencies
-
-Plugins Catalog gets your sources from a Go module proxy, so your plugins need to be versioned with a git tag.
-
-Last but not least, if your plugin has Go package dependencies, you need to vendor them and add them to your GitHub repository.
 
 If something goes wrong with the integration of your plugin, Plugins Catalog will create an issue inside your Github repository and will stop trying to add your repo until you close the issue.
 

@@ -20,12 +20,11 @@ providers:
       debug: true
       cloudConfig:
         type: mock
-        projectID: "puckwax-schedule-helper"
         zone: "us-central1-a"
-        resetAfter: 2m
+        resetAfter: 2m  # how long to wait before resetting the scale to initialScale
         initialScale:
-          whoami-test@docker: 1
-          whoami-2-test@docker: 3
+          whoami-test@docker: 1  # initial number of instances to start with
+          whoami-2-test@docker: 3  # initial number of instances to start with
 
   docker:
     endpoint: "unix:///var/run/docker.sock"
