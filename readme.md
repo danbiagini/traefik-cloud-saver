@@ -71,7 +71,7 @@ providers:
           type: service_account
 ```
 
-You need to provide a service account json file in the container, for example at `/etc/gcp/test_service_account.json`, or use a different path and change the `secret` path in the above config.
+You need to provide a service account json file in the container, for example at `/etc/gcp/test_service_account.json`, or use a different path, but change the `secret` path in the above config.
 
 ## 🔍 How It Works
 

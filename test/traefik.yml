@@ -21,6 +21,11 @@ providers:
       cloudConfig:
         type: mock
         zone: "us-central1-a"
+        region: "us-central1"
+        projectID: "Change this to your GCP project ID or not needed if in service account json file"
+        credentials:
+          secret: "Change this to a valid service account json file path"
+          type: service_account
         resetAfter: 2m  # how long to wait before resetting the scale to initialScale
         initialScale:
           whoami-test@docker: 1  # initial number of instances to start with

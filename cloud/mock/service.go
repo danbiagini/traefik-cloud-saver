@@ -53,7 +53,7 @@ func New(cloudConfig *common.CloudServiceConfig, opts ...ServiceOption) (*Servic
 		}
 	}
 
-	common.LogProvider("mock", "creating mock service")
+	common.LogProvider("mock", "[WARNING] Creating a 'mock' service.  This is for testing only and won't actually scale down instances.  Use 'type: gcp' in the cloudConfig for real world usage")
 	s := &Service{
 		scale:      make(map[string]int32),
 		failAfter:  cloudConfig.FailAfter,
@@ -110,7 +110,7 @@ func (s *Service) ScaleDown(_ context.Context, serviceName string) error {
 	}
 
 	if current <= 0 {
-		common.LogProvider("mock", "service %s already at minimum scale", serviceName)
+		common.DebugLog("mock", "service %s already at minimum scale", serviceName)
 		return nil
 	}
 
@@ -122,11 +122,11 @@ func (s *Service) ScaleUp(_ context.Context, serviceName string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	common.LogProvider("mock", "scaling up service '%s' (current scale: %d)",
+	common.DebugLog("mock", "scaling up service '%s' (current scale: %d)",
 		serviceName, s.scale[serviceName])
 
 	if s.scaleErr != nil {
-		common.LogProvider("mock", "error scaling up: %v", s.scaleErr)
+		common.LogProvider("mock", "[ERROR] error scaling up: %v", s.scaleErr)
 		return s.scaleErr
 	}
 
@@ -161,7 +161,7 @@ func (p *Service) SetScale(serviceName string, scale int32) {
 
 // Reset clears all stored scales and errors
 func (p *Service) Reset() {
-	common.LogProvider("mock", "resetting scale values for mock service")
+	common.DebugLog("mock", "resetting scale values for mock service")
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	p.scale = make(map[string]int32)
