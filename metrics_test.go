@@ -120,6 +120,9 @@ func TestFetchServiceRequests(t *testing.T) {
 			_, err := w.Write([]byte(`
 traefik_service_requests_total{service="service1"} 100
 traefik_service_requests_total{service="service2"} 200
+traefik_service_requests_total{code="200",method="GET",protocol="http",service="service3@file"} 300
+traefik_service_requests_total{code="200",method="POST",protocol="http",service="service3@file"} 301
+traefik_service_requests_total{code="404",method="GET",protocol="http",service="service3@file"} 302
 `))
 			if err != nil {
 				t.Fatalf("failed to write response: %v", err)
@@ -132,11 +135,14 @@ traefik_service_requests_total{service="service2"} 200
 		if err != nil {
 			t.Errorf("fetchServiceRequests() error = %v", err)
 		}
-		if len(counts) != 2 {
-			t.Errorf("Expected 2 entries, got %d", len(counts))
+		if len(counts) != 3 {
+			t.Errorf("Expected 3 entries, got %d", len(counts))
 		}
 		if counts["service1"] != 100 {
 			t.Errorf("service1 count = %v, want 100", counts["service1"])
 		}
+		if counts["service3@file"] != 601 {
+			t.Errorf("service3@file count = %v, want 603", counts["service3@file"])
+		}
 	})
-} 
+}

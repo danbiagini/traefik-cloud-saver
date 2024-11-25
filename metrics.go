@@ -1,12 +1,12 @@
 package traefik_cloud_saver
 
 import (
+	"bufio"
 	"fmt"
 	"io"
 	"net/http"
 	"strings"
 	"time"
-	"bufio"
 
 	"github.com/danbiagini/traefik-cloud-saver/cloud/common"
 )
@@ -42,7 +42,7 @@ func (mc *MetricsCollector) GetServiceRates() (map[string]*ServiceRate, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch service metrics: %w", err)
 	}
-	
+
 	now := time.Now()
 	duration := now.Sub(mc.lastTime)
 	rates := make(map[string]*ServiceRate)
@@ -64,9 +64,9 @@ func (mc *MetricsCollector) GetServiceRates() (map[string]*ServiceRate, error) {
 
 		rates[service] = &ServiceRate{
 			ServiceName: service,
-			Total:      count,
-			PerMin:     ratePerMin,
-			Duration:   duration,
+			Total:       count,
+			PerMin:      ratePerMin,
+			Duration:    duration,
 		}
 	}
 
@@ -106,10 +106,16 @@ func (mc *MetricsCollector) fetchServiceRequests() (map[string]float64, error) {
 	for scanner.Scan() {
 		line := scanner.Text()
 		if strings.HasPrefix(line, "traefik_service_requests_total") {
-			// Parse service name and count from the metric line
-			// Format: traefik_service_requests_total{service="servicename"} 123
+			// Parse service name and count from the metric line.
+			// Accumulate the count for each service if the response code is 200 or it has no response codes.
+			// Example:
+			// traefik_service_requests_total{service="servicename",method="GET",code="200"} 10
+			// traefik_service_requests_total{service="servicename",method="POST",code="200"} 20
+			// traefik_service_requests_total{service="servicename",method="GET",code="404"} 50
+			// will be accumulated as:
+			// serviceCounts["servicename"] = 30
 			if service, count, ok := parseMetricLine(line); ok {
-				serviceCounts[service] = count
+				serviceCounts[service] += count
 			}
 		}
 	}
@@ -130,15 +136,25 @@ func parseMetricLine(line string) (string, float64, bool) {
 			return "", 0, false
 		}
 
-		// Parse service name
+		// Parse service name & response code
 		if start := strings.Index(line, `service="`); start != -1 {
 			start += len(`service="`)
 			if end := strings.Index(line[start:], `"`); end != -1 {
 				serviceName = line[start : start+end]
+
+				// only return true count if the response code is 200 or it has no response codes
+				if responseCode := strings.Index(line, `code="`); responseCode != -1 {
+					code := line[responseCode+len(`code="`) : responseCode+len(`code="`)+3]
+					if code != "200" && code != "" {
+						return "", 0, false
+					}
+					return serviceName, count, true
+				}
+				// return true count if there is no response code
 				return serviceName, count, true
 			}
 		}
 	}
 
 	return "", 0, false
-} 
+}
